@@ -24,8 +24,8 @@ test('boss pool = bloodPoint[difficulty] × the players alive at the fight\'s st
   const { tuning, ...RAW } = DATA; // eslint-disable-line no-unused-vars
   const gd = new GameData(RAW, 'mode_multi_hard');
   for (const n of [1, 2, 3, 4]) assert.equal(bossPoolHp(gd, 'boss_1', n), 1800000 * n, `${n} alive`);
-  assert.equal(bossPoolHp(gd, 'boss_1'), 1800000 * 4, 'no count given: a full team');
-  assert.equal(bossPoolHp(gd, 'boss_1', 9), 1800000 * 4, 'at most aliveFull (4) players');
+  assert.equal(bossPoolHp(gd, 'boss_1'), 1800000 * 8, 'no count given: a full team');
+  assert.equal(bossPoolHp(gd, 'boss_1', 9), 1800000 * 8, 'at most aliveFull (8) players');
   assert.equal(gd.bossPoolHp('boss_1', 2), bossPoolHp(gd, 'boss_1', 2), 'GameData agrees');
   assert.equal(bossPoolHp(new GameData(RAW, 'mode_single_abyss'), 'boss_5', 1), 3000000, 'solo: the table value');
   assert.equal(bossPoolHp(new GameData(RAW, 'mode_single_funny'), 'boss_2', 1), 225000);
@@ -35,7 +35,7 @@ test('boss pool = bloodPoint[difficulty] × the players alive at the fight\'s st
   for (const n of [4, 3, 2, 1, undefined, 9]) assert.equal(bossPoolHp(new GameData(fixed, 'mode_multi_hard'), 'boss_1', n), 1800000, `fixed pool, ${n} alive`);
   assert.equal(bossPoolHp(new GameData(fixed, 'mode_single_abyss'), 'boss_5', 1), 750000);
   assert.equal(bossPoolHp(new GameData(fixed, 'mode_single_funny'), 'boss_2', 1), 56250);
-  const scaled = new GameData(withScale({ perPlayer: false, aliveScaling: true }), 'mode_multi_hard');
+  const scaled = new GameData(withScale({ perPlayer: false, aliveScaling: true, aliveFull: 4 }), 'mode_multi_hard');
   assert.equal(bossPoolHp(scaled, 'boss_1', 4), 1800000);
   assert.equal(bossPoolHp(scaled, 'boss_1', 3), 1350000);
   assert.equal(bossPoolHp(scaled, 'boss_1', 2), 900000);
@@ -61,7 +61,7 @@ test('boss pool = bloodPoint[difficulty] × the players alive at the fight\'s st
   assert.equal(pool.byPlayer.get('a'), 60);
 });
 
-for (const n of [1, 2, 3, 4]) {
+for (const n of [1, 2, 3, 4, 5, 6, 7, 8]) {
   test(`Final Assault with ${n} player(s): fields, sides, templates, merged LP, shared pool, victory`, () => {
     const h = makeMatch({ mode: 'coop', difficulty: 'FUNNY', humans: n, seed: 40 + n, fake: true, script: (b) => (b.kind === 'boss' ? { bossDps: 1e9 } : {}) }).start();
     const m = h.m;
@@ -71,7 +71,7 @@ for (const n of [1, 2, 3, 4]) {
     assert.equal(m.teamLp, lps.reduce((a, b) => a + b, 0), 'merged team LP');
     const fields = bossFields();
     assert.equal(fields.length, Math.ceil(n / 2));
-    assert.deepEqual(fields.map((f) => f.fieldId), Math.ceil(n / 2) === 2 ? ['b1', 'b2'] : ['b1']);
+    assert.deepEqual(fields.map((f) => f.fieldId), Array.from({ length: Math.ceil(n / 2) }, (_, i) => 'b' + (i + 1)));
     const pool = fields[0].sharedBoss;
     assert.ok(fields.every((f) => f.sharedBoss === pool), 'one pool for every boss field');
     assert.equal(pool.maxHp, bossPoolHp(m.gd, m.bossId, n));
@@ -160,6 +160,34 @@ test('Hidden Core: Σ activated layers (end of the boss prep) > 1200 and team LP
   h.drive(() => m.phase === PHASE.HIDDEN_CORE);
   const f = bossFields().find((b) => b.kind === 'hidden');
   assert.ok(f, 'hidden field');
+  assert.equal(f.opts.bossId, m.hiddenBossId);
+  assert.equal(m.teamLp, lp, 'team LP carries over');
+  const end = h.runToEnd();
+  assert.equal(end.victory, true);
+  assert.equal(end.hiddenReached, true);
+  assert.equal(end.hiddenCleared, true);
+  assert.equal(end.roundsPassed, 15);
+  m.dispose();
+});
+
+test('Eight players Hidden Core: Σ activated layers (end of the boss prep) > 1200 and team LP > 1 after a win → R15 prep → HIDDEN_CORE', () => {
+  const h = makeMatch({ mode: 'coop', difficulty: 'NORMAL', humans: 8, seed: 52, fake: true, script: (b) => (b.kind === 'boss' || b.kind === 'hidden' ? { bossDps: 1e9 } : {}) }).start();
+  const m = h.m;
+  assert.equal(m.gd.hiddenRound, 15);
+  assert.ok(m.hiddenBossId && ['boss_8', 'boss_9', 'boss_10'].includes(m.hiddenBossId));
+  h.drive(() => m.phase === PHASE.PREP && m.round === 14);
+  for (const p of m.players.values()) { p.bondCountBonus.yanShip = 3; p.layers.yanShip = 601; p.recompute(); }
+  h.drive(() => m.phase === PHASE.FINAL_ASSAULT);
+  assert.equal(m.hiddenLayerSum, 4808);
+  h.drive(() => m.phase === PHASE.PREP && m.round === 15);
+  assert.equal(m.phase, PHASE.PREP);
+  assert.ok(m.deadline > 0, 'R15 prep is timed in co-op');
+  assert.equal(Math.round((m.deadline - h.sched.now()) / 1000), m.gd.prepTime(15));
+  const lp = m.teamLp;
+  h.drive(() => m.phase === PHASE.HIDDEN_CORE);
+  const f = bossFields().find((b) => b.kind === 'hidden');
+  assert.ok(f, 'hidden field');
+  assert.equal(bossFields().filter(b => b.kind === 'hidden').length, 4);
   assert.equal(f.opts.bossId, m.hiddenBossId);
   assert.equal(m.teamLp, lp, 'team LP carries over');
   const end = h.runToEnd();

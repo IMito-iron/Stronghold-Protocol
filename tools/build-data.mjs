@@ -6,8 +6,9 @@
 //   config, chess, bonds, garrisons, items, bands, effects, choices, enemies, factions, waves,
 //   stages, bosses, tokens, backups (every field is documented in docs/DATA.md).
 //
-// Usage:  node tools/build-data.mjs [--refresh | --offline] [--out <dir>] [--cache <dir>]
+// Usage:  node tools/build-data.mjs [--refresh | --offline] [--sync-player-limit] [--out <dir>] [--cache <dir>]
 //                                   [--report <file>] [--quiet] [--no-research] [--force]
+//   --sync-player-limit sync only bossHpScale.aliveFull in existing config.json (no downloads)
 //   --refresh      re-download every official file even if cached
 //   --offline      never download; fail when a file is missing from the cache
 //   --out          output directory (default: <repo>/data)
@@ -30,6 +31,7 @@
 // chess · backups · tokens · bonds · garrisons · items · bands · effects · choices · enemies · factions ·
 // waves · stages · bosses · config · validation · main.
 
+import { MAX_SEATS } from '../shared/constants.js';
 import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -46,20 +48,20 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const RESEARCH_DIR = join(ROOT, 'docs', 'research');
 const GAMEDATA_URL = 'https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/master/zh_CN/gamedata/';
 const SEASON = 'act2autochess';
-const USAGE = 'usage: node tools/build-data.mjs [--refresh | --offline] [--out <dir>] [--cache <dir>] [--report <file>] [--quiet] [--no-research] [--force]';
+const USAGE = 'usage: node tools/build-data.mjs [--refresh | --offline] [--sync-player-limit] [--out <dir>] [--cache <dir>] [--report <file>] [--quiet] [--no-research] [--force]';
 
 /**
  * Parse the command line strictly (unknown options and missing values are errors, so a typo can
  * never silently write data somewhere unexpected).
  * @param {string[]} argv
- * @returns {{refresh:boolean, offline:boolean, quiet:boolean, noResearch:boolean, force:boolean, out:string, cache:string, report:string}}
+ * @returns {{syncPlayerLimit:boolean, refresh:boolean, offline:boolean, quiet:boolean, noResearch:boolean, force:boolean, out:string, cache:string, report:string}}
  */
 function parseArgs(argv) {
   const opts = {
-    refresh: false, offline: false, quiet: false, noResearch: false, force: false,
+    syncPlayerLimit: false, refresh: false, offline: false, quiet: false, noResearch: false, force: false,
     out: join(ROOT, 'data'), cache: join(ROOT, '.cache', 'gamedata'), report: join(ROOT, '.cache', 'build-data-report.json'),
   };
-  const flags = { '--refresh': 'refresh', '--offline': 'offline', '--quiet': 'quiet', '--no-research': 'noResearch', '--force': 'force' };
+  const flags = { '--sync-player-limit': 'syncPlayerLimit', '--refresh': 'refresh', '--offline': 'offline', '--quiet': 'quiet', '--no-research': 'noResearch', '--force': 'force' };
   const dirs = { '--out': 'out', '--cache': 'cache', '--report': 'report' };
   for (let i = 0; i < argv.length; i++) {
     const [name, inline] = argv[i].includes('=') ? [argv[i].slice(0, argv[i].indexOf('=')), argv[i].slice(argv[i].indexOf('=') + 1)] : [argv[i], null];
@@ -3670,7 +3672,7 @@ function buildConfig(ctx, waves, stages, bands) {
     // share; it replaces the fixed pool of 「保持固定血量」 (perPlayer false + solo 0.25 restore it)
     bossHpScale: {
       formula: 'one pool for every boss field ("所有人将一起对敌方领袖造成伤害"; the mirrored copies of a pair field share it, "两侧的敌方领袖共享生命值（敌方领袖的总生命值不变）") = bloodPoint[difficulty] × share. perPlayer true (the owner\'s decision of 2026-10-06, PR #209): co-op share = coop × the players alive when the fight starts (bots and AI 托管 seats count, eliminated and departed seats do not), at most aliveFull; solo share = solo (1). perPlayer false (the fixed pool of 0.1.x, 「保持固定血量」): co-op share = coop whatever the count (× alive / aliveFull with aliveScaling, the alive / 4 proportion [ASSUMED]: 巴哈姆特 12294); solo was 0.25 [ASSUMED]',
-      perPlayer: true, coop: 1, solo: 1, aliveFull: 4, aliveScaling: false, aliveAssumed: true, unaffectedByEnemyScale: true,
+      perPlayer: true, coop: 1, solo: 1, aliveFull: MAX_SEATS, aliveScaling: false, aliveAssumed: true, unaffectedByEnemyScale: true,
     },
     hiddenCore: { single: 350, multi: 1200, minTeamLpExclusive: 1, difficulties: ['NORMAL', 'HARD', 'ABYSS'], checkedAfterRound: 14 },
     dp: { init: 10, perSec: 1, max: 99 },
@@ -3933,6 +3935,18 @@ function validateAll(f) {
 // ===== main =====================================================================================
 
 async function main() {
+  // Sync a fork's player capacity without rebuilding unrelated official game data.
+  if (OPTS.syncPlayerLimit) {
+    const dest = join(OPTS.out, 'config.json');
+    const config = JSON.parse(await readFile(dest, 'utf8'));
+    if (!config.bossHpScale || typeof config.bossHpScale !== 'object') throw new Error('config.json needs bossHpScale');
+    config.bossHpScale.aliveFull = MAX_SEATS;
+    const tmp = dest + '.tmp-' + process.pid;
+    await writeFile(tmp, JSON.stringify(config));
+    await rename(tmp, dest);
+    log('synced bossHpScale.aliveFull to ' + MAX_SEATS);
+    return;
+  }
   const t0 = Date.now();
   const ctx = await loadContext();
   log('building…');

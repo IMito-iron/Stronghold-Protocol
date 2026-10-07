@@ -104,3 +104,7 @@ Official rule (bwiki 盟约, 更新公告 5114): before a match the player canno
 **自选编队 (0.2.0):** the overlay's third tab fills the four DIY slots (5阶 ×2, 6阶 ×2) with an owned 6★ outside the chess pool (any of its three skills, any module of its elite form but a 集成战略 one) or a prototype (its locked skill / module); only operators with a kit are offered (`welcome.diyKitted`). Per-browser `sp.pref.diy` = `{ v, picks }`, synced as `room.diy { picks }` by the same sync engine; 导出 / 导入 as `{ kind: 'stronghold.diy', v, exportedAt, count, picks }` (`ui/diyModel.js`, `screens/diy.js`). In the match a slotted piece is the operator for its player (name, art, class, bonds from its factions, no 特质, the pick's skill and module; the slot's tier, price and merge), sold only in that player's shop from the slot's 调度中心 level with its own stock; the shop / reward / detail cards and the own pieces carry a 「自选」 badge (`ui/gameLogic/diy.js`); the 0.2.0 自选编队 design subsection has the rules and sources.
 
 ---
+
+## Fork: eight-player co-op (2026-10-08)
+
+The owner requests up to eight human/bot seats, plus two independent spectator seats. Boss HP follows v0.2.1 per-alive-player scaling, capped at eight. Disconnected humans and bots count; eliminated and departed players do not. Pairing remains two players per field, with one solo field for an odd count. Other balance rules and single-player behavior are unchanged.

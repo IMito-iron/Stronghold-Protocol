@@ -1,5 +1,5 @@
 /* ==========================================================================================
-   screens/room.css — room/waiting screen: invite key, 4 seat cards, bottom action bar.
+   screens/room.css — room/waiting screen: invite key, 8 seat cards, bottom action bar.
    ========================================================================================== */
 
 .room-screen .topbar { height: 1.36rem; }
@@ -306,3 +306,23 @@
 .ready-count__icons .icon.is-on { color: var(--mint-400); filter: drop-shadow(0 0 4px var(--mint-glow)); }
 
 .room-bar .btn--xl { min-width: 3.2rem; letter-spacing: .2em; }
+
+/* Eight-player rooms keep actions visible while seats scroll. */
+.seats:not(.seats--solo) {
+  grid-template-rows: none;
+  grid-auto-rows: minmax(2.8rem, 1fr);
+  align-content: start;
+  overflow-y: auto;
+  gap: .16rem;
+}
+.seats:not(.seats--solo) .seat__art { min-height: .65rem; }
+.seats:not(.seats--solo) .seat__art .avatar { --av: 1.1rem; }
+@media (max-width: 800px) {
+  .seats:not(.seats--solo) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 480px) {
+  .seats:not(.seats--solo) { padding: .16rem; }
+  .room-bar { height: auto; min-height: 1.5rem; grid-template-columns: 1fr auto; padding: .12rem .16rem; gap: .12rem; }
+  .room-bar__left { grid-column: 1 / -1; }
+  .room-bar .btn--xl { min-width: 0; }
+}

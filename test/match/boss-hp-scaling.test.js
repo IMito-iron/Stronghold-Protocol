@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeMatch, DATA } from './harness.js';
-import { GameData } from '../../server/match/gamedata.js';
+import { GameData, bossPoolShareOf } from '../../server/match/gamedata.js';
 import { bossPoolHp, SharedBossPool } from '../../server/match/finalAssault.js';
 import { makeBattle } from '../helpers/battleHarness.js';
 
@@ -17,7 +17,7 @@ test('every leader and difficulty: bloodPoint × the players alive (co-op), × 1
     const solo = new GameData(DATA, `mode_single_${difficulty.toLowerCase()}`);
     for (const id of Object.keys(DATA.bosses)) {
       const base = DATA.bosses[id].bloodPoint[difficulty];
-      for (const n of [1, 2, 3, 4]) assert.equal(bossPoolHp(gd, id, n), base * n, `${id} ${difficulty} ×${n}`);
+      for (const n of [1, 2, 3, 4, 5, 6, 7, 8]) assert.equal(bossPoolHp(gd, id, n), base * n, `${id} ${difficulty} ×${n}`);
       assert.equal(bossPoolHp(solo, id, 1), base, `${id} ${difficulty} solo`);
     }
   }
@@ -64,7 +64,7 @@ test('config restores the fixed pool of 0.1.x (perPlayer false, solo 0.25) — G
     const gd = new GameData(data, modeId);
     const base = data.bosses.boss_8.bloodPoint.ABYSS;
     const expected = gd.isSolo ? base * 0.25 : base;
-    for (const n of [1, 2, 3, 4]) {
+    for (const n of [1, 2, 3, 4, 5, 6, 7, 8]) {
       assert.equal(gd.bossPoolHp('boss_8', n), expected, `${modeId} ×${n}`);
       assert.equal(bossPoolHp(gd, 'boss_8', n), expected);
       // a caller's game-data object without bossPoolShare reads the same config through bossPoolShareOf
@@ -100,3 +100,32 @@ test('only the leader\'s pool scales: escorts and the Hidden Core\'s parts keep 
     assert.deepEqual(four.slice(1), one.slice(1), `${kind}: escort and part unchanged`);
   }
 });
+
+
+test('eight-seat cap and mode overrides agree with the pure fallback', () => {
+  const cfg = { perPlayer: true, aliveFull: 8 };
+  assert.equal(bossPoolShareOf(null, cfg, false, 8), 8);
+  assert.equal(bossPoolShareOf(null, cfg, false, 9), 8);
+  assert.equal(bossPoolShareOf(null, null, false, 8), 8);
+  assert.equal(bossPoolShareOf({ aliveFull: 4 }, cfg, false, 8), 4);
+  assert.equal(bossPoolShareOf({ perPlayer: false }, cfg, false, 8), 1);
+  assert.equal(bossPoolShareOf(null, cfg, true, 8), 1);
+});
+for (const hidden of [false, true]) {
+  test('eight seats: bots and disconnected players count, departed/eliminated do not, hidden=' + hidden, () => {
+    const h = makeMatch({ humans: 7, bots: 1, difficulty: 'HARD', fake: true, instant: false }).start();
+    try {
+      h.toPrep(1);
+      h.m.onDisconnect('p_4');
+      h.ps('p_5').eliminate(1);
+      h.m.onLeave('p_6');
+      h.m.round = hidden ? 15 : 14;
+      h.m.teamLp = 50;
+      h.m._planBossWaves();
+      h.m.startFinalAssault(hidden);
+      assert.equal(h.m.alivePlayers().length, 6);
+      const bossId = hidden ? h.m.hiddenBossId : h.m.bossId;
+      assert.equal(h.m.bossPool.maxHp, h.m.gd.boss(bossId).bloodPoint.HARD * 6);
+    } finally { h.m.dispose(); }
+  });
+}

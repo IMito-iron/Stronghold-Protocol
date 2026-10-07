@@ -707,3 +707,7 @@ Not in this data: a player's ownership roster and 自选 picks (browser settings
 the DIY stock (per player in the match, `PlayerState.diyStock`: `config.economy.poolCopies` of the slot's tier — no excel
 field), 助战 borrows (`borrowCount` 20), the owned-operator training bonus (`prepareStateDict`), a per-player potential (every
 form is built at full potential, as every chess: the owner's decision of 2026-10-07).
+
+### Fork player capacity
+
+Run `node tools/build-data.mjs --offline --sync-player-limit` to regenerate only bossHpScale.aliveFull from MAX_SEATS in the existing config. The full data build uses the same constant. This avoids unrelated official-data changes when updating room capacity.

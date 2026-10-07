@@ -668,3 +668,9 @@
 .pauseov__plate h2 { font-size: .5rem; font-weight: 900; letter-spacing: .3em; color: #fff; text-shadow: 0 0 .2rem rgba(0, 0, 0, .8); }
 .pauseov__note { font-size: .17rem; color: var(--text-md); text-shadow: 0 1px 2px #000; }
 .pauseov__btns { display: flex; gap: .2rem; }
+
+/* Compact, scrollable team list for extended co-op rooms. */
+.team--many { max-height: calc(100% - 3.8rem); overflow-y: auto; overflow-x: hidden; pointer-events: auto; gap: .06rem; padding: .1rem .15rem .1rem .04rem; }
+.team--many .team__row { flex-shrink: 0; }
+.team--many .pavatar { --pa: .55rem; }
+.team--many .team__bubble { left: .6rem; max-width: 1.7rem; z-index: 3; }

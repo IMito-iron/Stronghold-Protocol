@@ -544,7 +544,7 @@ describe('websocket lobby', () => {
     assert.equal(st.inMatch, false);
     assert.equal(st.seats.length, MAX_SEATS);
     assert.deepEqual(st.seats[0], { seat: 0, playerId: host.id, name: 'Host', isBot: false, ready: false, connected: true });
-    assert.deepEqual(st.seats.slice(1), [null, null, null]);
+    assert.deepEqual(st.seats.slice(1), Array(MAX_SEATS - 1).fill(null));
 
     const guest = await pool.player('Guest');
     const joined = await joinRoom(guest, st.code.toLowerCase());
@@ -584,11 +584,41 @@ describe('websocket lobby', () => {
     await expectError(host, { t: 'room.join', code: own.code }, ERR.ROOM_NOT_FOUND);
   });
 
+
+  test('eight humans: last seat reconnects, leaves, is kicked, becomes AI, and starts', async () => {
+    const host = await pool.player('Host8');
+    const st = await createRoom(host);
+    const guests = [];
+    for (let i = 1; i < MAX_SEATS; i++) {
+      const g = await pool.player('G' + i);
+      await joinRoom(g, st.code);
+      guests.push(g);
+    }
+    const last = guests.at(-1);
+    await last.terminate();
+    await host.waitFor('room.state', s => s.seats[7]?.connected === false);
+    const back = await pool.player('Back8', last.token);
+    assert.equal(back.id, last.id);
+    await back.waitFor('room.state', s => s.seats[7]?.connected === true);
+    await expectOk(back, { t: 'room.leave' });
+    await joinRoom(back, st.code);
+    await expectOk(host, { t: 'room.kick', seat: 7, playerId: back.id });
+    await back.waitFor('room.closed');
+    await expectOk(host, { t: 'room.addBot' });
+    await host.waitFor('room.state', s => s.seats[7]?.isBot);
+    await expectOk(host, { t: 'room.removeBot', seat: 7 });
+    await joinRoom(back, st.code);
+    for (const g of [...guests.slice(0, -1), back]) await expectOk(g, { t: 'room.ready', ready: true });
+    await expectOk(host, { t: 'room.start' });
+    const started = await back.waitFor('room.state', s => s.inMatch);
+    assert.equal(started.seats.filter(Boolean).length, 8);
+  });
+
   test('room full, solo rooms admit one human and no AI', async () => {
     const host = await pool.player('H');
     const st = await createRoom(host);
     const guests = [];
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < MAX_SEATS - 2; i++) {
       const g = await pool.player(`G${i}`);
       await joinRoom(g, st.code);
       guests.push(g);
@@ -634,7 +664,7 @@ describe('websocket lobby', () => {
     const s3 = await pool.player('Watcher3');
     await expectError(s3, { t: 'room.spectate', code: st.code }, ERR.ROOM_FULL);
     await joinRoom(s3, st.code);
-    await expectOk(host, { t: 'room.addBot' });
+    for (let i = 3; i < MAX_SEATS; i++) await expectOk(host, { t: 'room.addBot' });
     const full = await host.waitFor('room.state', (s) => s.seats.every(Boolean));
     assert.equal(full.spectators.length, 2);
     await expectOk(s3, { t: 'room.ready', ready: true });

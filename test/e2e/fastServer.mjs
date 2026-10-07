@@ -74,6 +74,11 @@ if (!process.env.NODE_TEST_CONTEXT) {
         const ps = humans[i];
         if (ps && ps.alive) { ps.lp = 0; ps.eliminate(r); ps.dirty(); }
       }
+      // A direct jump skips the Final Assault that normally initializes shared LP.
+      if (target === this.gd.hiddenRound && this.teamLp == null) {
+        this.teamLp = this.alivePlayers().reduce((sum, ps) => sum + Math.max(0, ps.lp), 0);
+        for (const ps of this.alivePlayers()) ps.lpAtFinal = Math.max(0, ps.lp);
+      }
       super.startRound(Number.isInteger(target) && target > r ? target : r);
       humans.forEach((ps, i) => { if (ps.alive) this._starterKit(ps, Array.isArray(humanKits[i]) ? humanKits[i] : null); });
       if (botChess.length) for (const ps of this.alivePlayers()) if (ps.isBot) { this._give(ps, botChess); ps.recompute(); }
