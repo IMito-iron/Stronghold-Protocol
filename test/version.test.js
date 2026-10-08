@@ -16,7 +16,7 @@ const lock = JSON.parse(read('package-lock.json'));
 
 test('one release version: package.json, package-lock.json and APP_VERSION', () => {
   // a release x.y.z, or x.y.z-dev on the public dev branch (the owner's decision of 2026-10-06)
-  assert.match(APP_VERSION, /^\d+\.\d+\.\d+(-dev)?$/);
+  assert.match(APP_VERSION, /^\d+\.\d+\.\d+(-dev|-plugins\.\d+)?$/);
   assert.equal(DEV_BUILD, APP_VERSION.endsWith('-dev'));
   assert.equal(pkg.version, APP_VERSION);
   assert.equal(lock.version, APP_VERSION);
@@ -27,7 +27,7 @@ test('one release version: package.json, package-lock.json and APP_VERSION', () 
 
 test('CHANGELOG.md opens with the release version, and the README links it', () => {
   const log = read('CHANGELOG.md');
-  const first = log.match(/^## (\d+\.\d+\.\d+) — (\d{4}-\d{2}-\d{2})/m);
+  const first = log.match(/^## (\d+\.\d+\.\d+(?:-plugins\.\d+)?) — (\d{4}-\d{2}-\d{2})/m);
   assert.ok(first, 'a "## x.y.z — date" heading');
   if (DEV_BUILD) {
     // a dev build has no entry of its own yet: the newest one is the last release, older than the version in development
@@ -71,7 +71,7 @@ test('GPL-3.0-or-later: LICENSE, package metadata and notices', () => {
   assert.match(license, /END OF TERMS AND CONDITIONS/);
   assert.equal(pkg.license, 'GPL-3.0-or-later');
   assert.equal(lock.packages[''].license, 'GPL-3.0-or-later');
-  assert.match(pkg.repository.url, /github\.com\/sganggs\/Stronghold-Protocol/);
+  assert.match(pkg.repository.url, /github\.com\/IMito-iron\/Stronghold-Protocol/);
   for (const f of ['NOTICE.md', 'THIRD-PARTY-NOTICES.md', 'tools/local-extract/LICENSE-Ark-Unpacker.txt']) {
     assert.ok(existsSync(join(ROOT, f)), f);
   }

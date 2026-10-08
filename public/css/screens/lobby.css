@@ -238,3 +238,8 @@
 .create-box { margin-top: .3rem; display: flex; flex-direction: column; gap: .12rem; }
 .create-box .btn--xl { height: .92rem; font-size: .32rem; letter-spacing: .3em; }
 .create-box__hint { display: flex; align-items: center; justify-content: center; min-height: .3rem; font-size: .14rem; color: var(--text-lo); }
+
+.plugin-picker { border: 1px solid var(--line); padding: .1rem; }
+.plugin-picker label { display: flex; gap: .08rem; padding: .05rem 0; cursor: pointer; }
+.plugin-picker small { opacity: .75; font-size: .11rem; }
+.plugin-picker { font-size: .14rem; }

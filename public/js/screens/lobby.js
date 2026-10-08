@@ -20,6 +20,7 @@ import { LoadoutButton } from './loadout.js';
 import { net, identity } from '../net.js';
 import { store, useStore, shallowEqual, loadPref, savePref } from '../store.js';
 import { getConfig, getMode, getStage, useData } from '../data.js';
+import { resolvePlugins } from '../../../shared/plugins.js';
 import { t, tc, N_ } from '../../../shared/i18n.js';
 
 /** Official mode texts (activity_table act2autochess.modeDataDict), fallback when config.json is absent. */
@@ -245,6 +246,13 @@ export function LobbyScreen() {
     const d = loadPref('lobby.difficulty', 'FUNNY');
     return DIFFICULTIES.includes(d) ? d : 'FUNNY';
   });
+  const catalog = useStore((s) => s.plugins);
+  const [pluginIds, setPluginIds] = useState([]);
+  const selectedIds = pluginIds.filter(id => catalog.some(p => p.id === id && p.modes.includes(roomMode)));
+  let selectedRules = { maxPlayers: roomMode === 'solo' ? 1 : MAX_SEATS };
+  let pluginError = '';
+  try { selectedRules = resolvePlugins(catalog, selectedIds, roomMode).rules; }
+  catch { pluginError = t('所选插件存在规则冲突'); }
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(null);
   const [recent] = useState(recentRooms);
@@ -268,7 +276,7 @@ export function LobbyScreen() {
       if (alive.current) setBusy(null);
     }
   };
-  const create = () => run('create', () => net.request('room.create', { mode: roomMode, difficulty }));
+  const create = () => run('create', () => net.request('room.create', { mode: roomMode, difficulty, plugins: selectedIds }));
   const join = (c = code) => {
     // `onClick=${join}` hands the click EVENT as the first argument, and a default parameter only applies to
     // `undefined` — codeArg keeps an event target out of the key and falls back to the input field
@@ -327,7 +335,7 @@ export function LobbyScreen() {
       <section class="lobby-left">
         <div class="section-label"><span class="section-label__idx num">01</span>${t('模拟方式')}<${MicroLabel}>MODE<//></div>
         <div class="mode-cards">
-          ${MODE_CARDS.map((c) => html`<${ModeCard} key=${c.id} card=${c} selected=${roomMode === c.id} onSelect=${pickMode} />`)}
+          ${MODE_CARDS.map((c) => html`<${ModeCard} key=${c.id} card=${c.id === 'coop' ? { ...c, params: { n: (roomMode === 'coop' ? selectedRules.maxPlayers : MAX_SEATS) - 1 }, pointParams: { n: roomMode === 'coop' ? selectedRules.maxPlayers : MAX_SEATS } } : c} selected=${roomMode === c.id} onSelect=${pickMode} />`)}
         </div>
 
         <div class="section-label"><span class="section-label__idx num">03</span>${t('加入同盟')}<${MicroLabel}>JOIN WITH ALLIANCE KEY<//></div>
@@ -355,9 +363,19 @@ export function LobbyScreen() {
         <div class="diff-list">
           ${DIFFICULTIES.map((d) => html`<${DifficultyCard} key=${d} roomMode=${roomMode} difficulty=${d} selected=${difficulty === d} onSelect=${pickDifficulty} />`)}
         </div>
+        <fieldset class="plugin-picker">
+          <legend>${t('房间插件')}</legend>
+          ${catalog.filter(p => p.modes.includes(roomMode)).map(p => html`<label key=${p.id}>
+            <input type="checkbox" checked=${selectedIds.includes(p.id)} disabled=${!!busy}
+              onChange=${(e) => setPluginIds(e.target.checked ? [...selectedIds, p.id] : selectedIds.filter(id => id !== p.id))} />
+            <span>${t(p.name)} <small>v${p.version}</small><br/><small>${p.description ? t(p.description) : ''}</small></span>
+          </label>`)}
+          <small>${t('插件在创建房间后固定，所有玩家使用相同规则')}</small>
+          ${pluginError ? html`<p role="alert">${pluginError}</p>` : null}
+        </fieldset>
         <div class="create-box">
           <${Tooltip} block=${true} text=${online ? null : t('正在连接服务器…')}>
-            <${Button} variant="primary" size="xl" block=${true} iconRight="chevrons" loading=${busy === 'create'} disabled=${!online} onClick=${create}>
+            <${Button} variant="primary" size="xl" block=${true} iconRight="chevrons" loading=${busy === 'create'} disabled=${!online || !!pluginError} onClick=${create}>
               ${roomMode === 'solo' ? t('开始独立模拟') : t('创建同盟')}
             <//>
           <//>

@@ -95,6 +95,7 @@
 //     a player seat (the seat is kept and given back on resume).
 
 import { randomBytes, randomInt } from 'node:crypto';
+import { loadPlugins, resolvePlugins, pluginData } from './plugins.js';
 import { ERR, MAX_SEATS, MAX_SPECTATORS, ROOM_CODE_LEN, modeIdFor } from '../shared/constants.js';
 import { checkLoadout, checkNotOwned, checkDiyPicks } from '../shared/protocol.js';
 import { encode, isDroppable, isErrCode, sendRaw, sendSession } from './net.js';
@@ -119,7 +120,7 @@ export const LOBBY_DEFAULTS = Object.freeze({
 export const SOLO_RECONNECT_FALLBACK_SEC = 86_400;
 
 /** Display names for AI teammates (the tutorial NPCs first, then a few familiar faces). */
-export const BOT_NAMES = Object.freeze(['AI·华法琳', 'AI·阿米娅', 'AI·惊蛰', 'AI·杜宾', 'AI·凯尔希', 'AI·可露希尔']); // i18n-ignore: player names (docs/I18N.md)
+export const BOT_NAMES = Object.freeze(['AI·华法琳', 'AI·阿米娅', 'AI·惊蛰', 'AI·杜宾', 'AI·凯尔希', 'AI·可露希尔', 'AI·罗德岛']); // i18n-ignore: player names (docs/I18N.md)
 
 const OK = Object.freeze({ ok: true });
 const fail = (code, detail) => (detail ? { error: code, detail } : { error: code });
@@ -146,17 +147,18 @@ function freezeDiy(picks) {
   return Object.freeze(out);
 }
 
-/** One room: 4 seat slots, host, difficulty, optional running match. */
+/** One room: fixed plugin selection, negotiated seats, host and optional running match. */
 export class Room {
   /** @param {string} code @param {'solo'|'coop'} mode @param {string} difficulty @param {number} now */
-  constructor(code, mode, difficulty, now) {
+  constructor(code, mode, difficulty, now, selection = resolvePlugins([], [], mode)) {
+    this.selection = selection;
     this.code = code;
     this.mode = mode;
     this.difficulty = difficulty;
     /** @type {string | null} */
     this.hostId = null;
     /** @type {(Seat | null)[]} */
-    this.seats = new Array(MAX_SEATS).fill(null);
+    this.seats = new Array(mode === 'solo' ? MAX_SEATS : selection.rules.maxPlayers).fill(null);
     /** @type {{ playerId: string, name: string, connected: boolean }[]} spectator seats, ≤ MAX_SPECTATORS (header) */
     this.spectators = [];
     /** @type {any} running Match instance */
@@ -203,6 +205,8 @@ export class Room {
       mode: this.mode,
       difficulty: this.difficulty,
       inMatch: !!this.match,
+      rules: this.selection.rules,
+      plugins: this.selection.plugins,
       seats: this.seats.map((s) => (s
         ? { seat: s.seat, playerId: s.playerId, name: s.name, isBot: s.isBot, ready: s.ready, connected: s.connected && !s.left }
         : null)),
@@ -222,10 +226,12 @@ export class Lobby {
    *   now?: () => number,
    *   seedFn?: () => number,
    *   options?: Partial<typeof LOBBY_DEFAULTS>,
+   *   plugins?: ReadonlyArray<any>,
    * }} opts
    */
-  constructor({ registry, log = noopLog, MatchClass = DefaultMatch, getData = defaultGetData, now = Date.now, seedFn, options = {} }) {
+  constructor({ registry, log = noopLog, MatchClass = DefaultMatch, getData = defaultGetData, now = Date.now, seedFn, options = {}, plugins = loadPlugins() }) {
     this.registry = registry;
+    this.plugins = plugins;
     this.log = log;
     this.MatchClass = MatchClass;
     this.getData = getData;
@@ -368,7 +374,10 @@ export class Lobby {
   // room.* handlers
   // ---------------------------------------------------------------------------------------------------
 
-  create(session, { mode, difficulty }) {
+  create(session, { mode, difficulty, plugins = [] }) {
+    let selection;
+    try { selection = resolvePlugins(this.plugins, plugins, mode); }
+    catch (e) { return fail(ERR.BAD_MSG, e.message); }
     const cur = this.roomOf(session);
     if (cur && cur.match) return fail(ERR.ROOM_STARTED, 'leave your running match first');
     if (this.rooms.size >= this.opts.maxRooms) return fail(ERR.INTERNAL, 'too many rooms');
@@ -384,7 +393,7 @@ export class Lobby {
     const code = this.genCode();
     if (!code) return fail(ERR.INTERNAL, 'no room code available');
     if (cur) this.removeMember(cur, session.playerId);
-    const room = new Room(code, mode, difficulty, this.now());
+    const room = new Room(code, mode, difficulty, this.now(), selection);
     room.ownerKey = key;
     room.seats[0] = this.humanSeat(0, session);
     room.hostId = session.playerId;
@@ -642,7 +651,7 @@ export class Lobby {
 
   /** Extra fields of every `welcome` (net.js): the operators a 自选 slot may field (shared/diy.js `kitted`). */
   welcomeInfo() {
-    return { diyKitted: KITTED_CHARS };
+    return { diyKitted: KITTED_CHARS, plugins: this.plugins };
   }
 
   // ---------------------------------------------------------------------------------------------------
@@ -678,7 +687,7 @@ export class Lobby {
         seed,
         // the room's match number: with the seed it keeps battleIds unique across the room's matches (DESIGN §14)
         matchNo: room.matchCount + 1,
-        data: this.safeData(),
+        data: pluginData(this.safeData(), room.selection, modeIdFor(room.mode, room.difficulty)),
         log: this.log,
         now: this.now,
         send: (playerId, msg) => (ctx.live ? this.matchSend(room, ctx, playerId, msg) : false),

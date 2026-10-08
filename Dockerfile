@@ -27,6 +27,7 @@ RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund && npm cache clean -
 # ---- 2. vendor libs + optional art download ---------------------------------------------------------
 FROM deps AS build
 ARG FETCH_ASSETS=0
+COPY plugins ./plugins
 COPY shared ./shared
 COPY server ./server
 COPY tools ./tools
@@ -47,6 +48,7 @@ ENV NODE_ENV=production \
 WORKDIR /app
 COPY --from=deps /app/package.json ./package.json
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=build /app/plugins ./plugins
 COPY --from=build /app/shared ./shared
 COPY --from=build /app/server ./server
 COPY --from=build /app/data ./data

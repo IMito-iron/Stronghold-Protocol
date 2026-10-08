@@ -1,0 +1,16 @@
+{
+  "id": "eight-players",
+  "apiVersion": 1,
+  "version": "1.0.0",
+  "name": "八人联机",
+  "description": "将合作房间容量及 Boss 存活人数上限扩展至 8。",
+  "author": "IMito-iron",
+  "license": "GPL-3.0-or-later",
+  "modes": [
+    "coop"
+  ],
+  "rules": {
+    "maxPlayers": 8,
+    "bossAliveFull": 8
+  }
+}

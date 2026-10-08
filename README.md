@@ -2,7 +2,7 @@
 
 《明日方舟》季节性自走棋塔防玩法「卫戍协议：盟约」的**非官方同人复刻**：浏览器即开即玩，单人或 1–4 人联机合作。
 
-![version](https://img.shields.io/badge/version-0.2.1-2ea44f)
+![version](https://img.shields.io/badge/version-0.2.1--plugins.1-2ea44f)
 ![license](https://img.shields.io/badge/code%20license-GPL--3.0--or--later-blue)
 ![node](https://img.shields.io/badge/node-22%20%7C%2024-339933)
 
@@ -252,3 +252,7 @@ An **unofficial, non-commercial fan remake** of Arknights' seasonal auto-chess t
 - **Disclaimer:** not affiliated with or endorsed by Hypergryph or Yostar. All Arknights names, art, audio, text and data are © their respective owners and are **not** covered by this project's GPL licence. For study and personal non-commercial use only — no selling, paid distribution, paid servers or monetisation of any kind. Content will be removed on request of the rights holders. Provided "as is", without warranty.
 - **License:** code GPL-3.0-or-later ([LICENSE](LICENSE)); game assets excluded.
 - **Contributing:** [CONTRIBUTING.md](CONTRIBUTING.md) (an English summary at its end); the code map is [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## 玩法插件（fork）
+
+本 fork 保留[上游项目](https://github.com/sganggs/Stronghold-Protocol)来源及版权。默认沿用四人规则；创建同盟时可选择随附的「八人联机」插件。管理员可以安装第三方规则插件，玩家加入房间后自动使用同一规则。开发和安装方法见 [docs/PLUGINS.md](docs/PLUGINS.md)。

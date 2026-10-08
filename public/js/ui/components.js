@@ -14,7 +14,7 @@
 import { h, Fragment } from '../../vendor/preact.module.js';
 import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from '../../vendor/hooks.module.js';
 import htm from '../../vendor/htm.module.js';
-import { DIFFICULTY_NAMES, DIFFICULTY_COLORS } from '../../../shared/constants.js';
+import { DIFFICULTY_NAMES, DIFFICULTY_COLORS, SEAT_HUES } from '../../../shared/constants.js';
 import { t } from '../../../shared/i18n.js';
 import { serverNow } from '../store.js';
 import { data, useData, localAsset } from '../data.js';
@@ -676,7 +676,7 @@ export function Spinner({ size = 'md', label, tone = 'mint', class: cls }) {
 
 // ---- Avatar frame ------------------------------------------------------------------------------
 
-const SEAT_HUES = [162, 196, 38, 280];
+
 /**
  * Square avatar frame with bracket corners. Falls back to a glyph (first letter / robot).
  * @param {{ name?: string, src?: string, size?: 'sm'|'md'|'lg'|'xl', seat?: number, host?: boolean, bot?: boolean,
@@ -685,7 +685,7 @@ const SEAT_HUES = [162, 196, 38, 280];
 export function AvatarFrame({ name = '', src, size = 'md', seat = 0, host, bot, self, ready, offline, dead, empty, class: cls }) {
   const [badSrc, setBadSrc] = useState(null);
   const imgOk = !!src && badSrc !== src;
-  const hue = SEAT_HUES[((seat | 0) % 4 + 4) % 4];
+  const hue = SEAT_HUES[((seat | 0) % SEAT_HUES.length + SEAT_HUES.length) % SEAT_HUES.length];
   const glyph = [...(name || '').trim()][0] || '?';
   return html`<div class=${cx('avatar', `avatar--${size}`, 'brackets', host && 'is-host', bot && 'is-bot', self && 'is-self',
       ready && 'is-ready', offline && 'is-offline', dead && 'is-dead', empty && 'is-empty', cls)} style=${`--seat-hue:${hue}`}>

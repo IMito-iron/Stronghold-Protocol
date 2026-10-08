@@ -1,3 +1,4 @@
+import { SEAT_HUES } from '../../../shared/constants.js';
 // Shared in-match building blocks (Preact + htm): data hook, images with fallbacks, rich text,
 // unit thumbnails, LP tower, coin badge, official UI sprites. Styles: css/screens/game*.css.
 
@@ -260,7 +261,7 @@ export function PlayerAvatar({ player, size = 'md', self = false, class: cls }) 
   const glyph = [...(player?.name || '').trim()][0] || '?';
   const dead = player?.alive === false || player?.status === 'dead';
   const left = player?.status === 'left';
-  const hue = [162, 196, 38, 280][((player?.seat | 0) % 4 + 4) % 4];
+  const hue = SEAT_HUES[((player?.seat | 0) % SEAT_HUES.length + SEAT_HUES.length) % SEAT_HUES.length];
   return html`<span class=${cx('pavatar', `pavatar--${size}`, self && 'is-self', dead && 'is-dead', left && 'is-left', player?.isBot && 'is-bot',
       player?.connected === false && !player?.isBot && 'is-offline', cls)} style=${`--seat-hue:${hue}`}>
     <span class="pavatar__img">

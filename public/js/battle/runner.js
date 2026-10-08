@@ -1,3 +1,4 @@
+import { SUPPORTED_SEATS } from '../../../shared/constants.js';
 // Local battle runner — client-side combat (DESIGN §14, research 09 §3.2 / §6.4).
 //
 // Like the official client, the browser simulates battles itself with the shared deterministic sim (server/sim,
@@ -434,13 +435,13 @@ export function createBattleRunner(deps) {
       msg.bossDmg = pool && Number.isFinite(pool.cum) ? pool.cum : 0;
       if (pool && pool.byPlayer) {
         const by = {};
-        for (const pid of Object.keys(pool.byPlayer).slice(0, 4)) by[pid] = pool.byPlayer[pid];
+        for (const pid of Object.keys(pool.byPlayer).slice(0, SUPPORTED_SEATS)) by[pid] = pool.byPlayer[pid];
         msg.by = by;
       }
     } else {
       msg.leaks = Math.min(1e6, p.leaks);
-      // 联防: the leakers' enemies still standing (shared/protocol.js b.progress `left`, ≤ 4 players)
-      if (p.left) msg.left = Object.fromEntries(Object.entries(p.left).slice(0, 4));
+      // 联防: the leakers' enemies still standing (shared/protocol.js b.progress `left`, ≤ SUPPORTED_SEATS players)
+      if (p.left) msg.left = Object.fromEntries(Object.entries(p.left).slice(0, SUPPORTED_SEATS));
     }
     try { net.send('b.progress', msg); } catch { /* offline */ }
   }

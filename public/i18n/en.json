@@ -1055,5 +1055,11 @@
   "选择「{name}」的朝向": "Choose {name}'s facing",
   "选择朝向": "Choose a facing",
   "朝向：{dir}": "Facing: {dir}",
-  "开发版 · 不稳定，请勿用于公开服务器": "Development build · unstable, not for public servers"
+  "开发版 · 不稳定，请勿用于公开服务器": "Development build · unstable, not for public servers",
+  "房间插件": "Room plugins",
+  "未启用插件": "No plugins enabled",
+  "插件在创建房间后固定，所有玩家使用相同规则": "Plugins are fixed when the room is created; all players use the same rules",
+  "所选插件存在规则冲突": "Selected plugins have conflicting rules",
+  "八人联机": "Eight-player co-op",
+  "将合作房间容量及 Boss 存活人数上限扩展至 8。": "Expands co-op capacity and the Boss alive-player cap to 8."
 }
