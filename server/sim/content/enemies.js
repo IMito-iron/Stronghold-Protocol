@@ -17,8 +17,10 @@
 //   hidden from later 'kill' handlers) · death(c,…) · status(c,…) (statusApplied on e) · burst(c,…) (elementBurst on e)
 //   · tick(b,e,a,dt) every `iv` s (every tick when iv is 0) · skill: `cd`/`left`(=icd)/`cond`/`fire` (cooldown runs
 //   continuously; fires when ready, the enemy can act and `cond` holds). `sil: true` = the ability's handbook line
-//   is flagged SILENCE (沉默 disables it: exactly the data's `format: "SILENCE"` lines — and 萨卡兹枯朽战士 / 组长's
-//   死亡爆炸, a NORMAL line whose client template checks 沉默: archetypes.js kitPolluted); stun / freeze / sleep block
+//   is flagged SILENCE (沉默 disables it: exactly the data's `format: "SILENCE"` lines). 萨卡兹枯朽战士 / 组长's
+//   【污染秽蚀】 death fog is the one NORMAL line also silenced (archetypes.js kitPolluted, `enemy_1267_nhpbr` and
+//   `_2` only): the owner's official-play recall of 2026-10-12 is that a death while silenced creates no fog, and
+//   that recall contradicts the PRTS / in-game text 「不可沉默」 (DESIGN §30.23). stun / freeze / sleep block
 //   skills. Enemy SP skills ("数次攻击后…"): SP +1 per attack, the (spCost+1)-th attack is the skill attack (official
 //   粉碎攻坚手 text: spCost 2 = "攻击2次后，下一次攻击").
 // Shared mechanics: reborn() — "首次被击倒后重生 / 第二形态" (the first KO is hidden from kill credit and bounty; a
@@ -116,9 +118,10 @@ import { REFLECTION_KITS } from './enemies/reflection.js';
 import { FLY_KITS } from './enemies/fly.js';
 import { SPECIAL_KITS } from './enemies/special.js';
 import { LEADER_KITS } from './enemies/leaders.js';
+import { hypot } from '../detmath.js';
 
 export {
-  EROSION, EROSION_BURST, HUSK_REBIRTH, nthOf, abOf, attach, T, silenced, canCast, elem, hurt, alliesInTiles,
+  EROSION, EROSION_BURST, HUSK_REBIRTH, nthOf, abOf, attach, T, silenced, canCast, unbalancedNow, elem, hurt, alliesInTiles,
   targetsNear, allTargets, areaAllies, areaAlliesInTiles, fieldAllies, auraAllies, targetAndArea, byPriority, zone,
   remainingRoute, stayRoute, spawnChildren, stepToward, setHits, hitCount, isHitCount, setForm, lpLoss, expose,
   expectedFinal, absorbArts,
@@ -259,7 +262,7 @@ function onTick(b, dt) {
       }
       if (a.fire && a.cd != null) {
         a.left -= dt;
-        if (a.left <= 1e-9 && canCast(e, a.sil) && (!a.cond || safe(b, e, () => a.cond(b, e, a)))) {
+        if (a.left <= 1e-9 && canCast(e, a.sil, b) && (!a.cond || safe(b, e, () => a.cond(b, e, a)))) {
           a.left = Math.max(TICK, a.cd);
           a.casts = (a.casts ?? 0) + 1;
           e.skillAnimUntil = b.time + 0.5;
@@ -312,7 +315,7 @@ function chaliceShare(b, c) {
   for (const o of b.enemies) {
     if (!o.alive || o === t || o.defId !== 'enemy_1430_lrrook' || !o.mem.ab) continue;
     const a = o.mem.ab.list[0];
-    if (!a || !(a.share > 0) || Math.hypot(o.x - t.x, o.y - t.y) > a.r) continue;
+    if (!a || !(a.share > 0) || hypot(o.x - t.x, o.y - t.y) > a.r) continue;
     const part = c.dmg.amount * a.share;
     c.dmg.amount -= part;
     // a 无来源 burst's share stays 无来源, credited like the burst (damage.js)

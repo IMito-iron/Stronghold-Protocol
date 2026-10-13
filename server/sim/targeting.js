@@ -2,7 +2,7 @@
 //
 // Grid ranges: `[dRow, dCol]` offsets relative to facing RIGHT, rotated by the unit's direction (sim/dir.js: RIGHT
 // (dr,dc), UP (dc,−dr), LEFT (−dr,−dc), DOWN (−dc,dr); row 0 = bottom). An enemy is in range when the tile containing
-// it (round(y), round(x)) is one of the absolute range tiles — a huge enemy (巨型单位) when any tile its hit rectangle
+// it (rounded half to even, detmath roundHalfEven; PRTS 作战机制 四舍六入五成双) is one of the absolute range tiles — a huge enemy (巨型单位) when any tile its hit rectangle
 // occupies is (body.js; user playtest #5 item 10). `rangeExtend` (ability_range_forward_extend) adds N tiles
 // past the furthest cell of every row, along +dCol BEFORE rotating (DESIGN §3).
 // Operator priority: (1) enemies it blocks (every blocker, ranged ones on melee tiles included — user playtest #6
@@ -17,6 +17,7 @@
 import { COLS, ROWS } from './constants.js';
 import { normDir, rotateOffset } from './dir.js';
 import { bodyDist } from './body.js';
+import { roundHalfEven } from './detmath.js';
 
 /**
  * Build the absolute tile-key list of a grid for a unit standing at (r,c) facing `dir` ('UP'|'RIGHT'|'DOWN'|'LEFT';
@@ -50,9 +51,9 @@ export function absoluteRangeKeys(grid, r, c, dir, extend = 0) {
 // record range (shared/loadoutRecord.js attackRangeGrid), re-exported here for the battle (Battle._refreshRange).
 export { extendedGrid } from '../../shared/loadoutRecord.js';
 
-/** Tile key of a unit's current position. */
+/** Tile key of a unit's current position (rounded half to even, as body.js). */
 export function tileKeyOf(u) {
-  const r = Math.round(u.y), c = Math.round(u.x);
+  const r = roundHalfEven(u.y), c = roundHalfEven(u.x);
   if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return -1;
   return r * COLS + c;
 }
@@ -193,7 +194,12 @@ const PRIORITY_FNS = {
 };
 
 /**
- * Sort candidate enemies for an attacker (in place) and return them.
+ * Sort candidate enemies for an attacker (in place) and return them: the enemies it blocks first (the user's rule after
+ * playtest #6, "阻挡了就一定要能打到", for every blocker — DESIGN §20.3), then the special priority, taunt, the remaining
+ * route, the spawn order. One exception, the owner's decision of 2026-10-08 (GitHub #220 by TsangAsuna, #205): the 速射手 air priority
+ * (trait 优先攻击空中单位 — priority 'fly', a skill's too) comes before its own blocked enemy, so a 速狙 on a melee tile
+ * blocking a ground enemy shoots the flyer in its range (PRTS 索敌的概念 「阻挡（近战限定）→特殊优先级→…」); every other
+ * priority keeps the blocked enemy first.
  * @param {object} attacker ally unit
  * @param {object[]} cands enemies
  * @param {string|null} priority profile/skill priority key
@@ -201,6 +207,7 @@ const PRIORITY_FNS = {
 export function sortEnemyTargets(battle, attacker, cands, priority) {
   if (cands.length <= 1) return cands;
   const pf = priority ? (PRIORITY_FNS[priority] || (priority === 'nearest' || priority === 'farthest' ? null : null)) : null;
+  const airFirst = priority === 'fly';
   const ax = attacker.x, ay = attacker.y;
   const keyed = cands.map((e) => ({
     e,
@@ -210,7 +217,7 @@ export function sortEnemyTargets(battle, attacker, cands, priority) {
     d: battle.remainingDistance(e),
     s: e.spawnSeq,
   }));
-  keyed.sort((a, b) => a.b - b.b || a.p - b.p || a.t - b.t || a.d - b.d || a.s - b.s);
+  keyed.sort((a, b) => (airFirst ? a.p - b.p : 0) || a.b - b.b || a.p - b.p || a.t - b.t || a.d - b.d || a.s - b.s);
   for (let i = 0; i < keyed.length; i++) cands[i] = keyed[i].e;
   return cands;
 }
@@ -218,7 +225,8 @@ export function sortEnemyTargets(battle, attacker, cands, priority) {
 /**
  * Enemy target selection among allies (PRTS 作战机制 索敌, 敌方: "阻挡→特殊优先级→仇恨值（更容易被攻击→…→最后部署的目标→
  * 不容易被攻击）→最早出现"): its blocker first → highest taunt level → latest deployed (`aggroSeq`: the deploy order —
- * Battle.start deploys the operators first and ranks the start-of-battle summons after them). Special priorities
+ * Battle.start deploys the operators first and ranks the start-of-battle summons after them; a prepared 外勤医疗 map
+ * character keeps an earlier aggro order). Special priorities
  * (优先攻击…) are the enemies' own content: `e.profile.canTarget` filters, key sorts broken by `aggroCmp`.
  */
 export function sortAllyTargets(enemy, cands) {

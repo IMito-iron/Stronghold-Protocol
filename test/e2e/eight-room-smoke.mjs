@@ -1,6 +1,7 @@
 
 import assert from 'node:assert/strict';
 import { TestClient } from '../helpers/wsClient.js';
+import { APP_VERSION } from '../../shared/constants.js';
 
 // Explicit smoke test: SP_SMOKE_URL=http://host:port node test/e2e/eight-room-smoke.mjs
 if (!process.env.NODE_TEST_CONTEXT && process.env.SP_SMOKE_URL) {
@@ -9,7 +10,7 @@ if (!process.env.NODE_TEST_CONTEXT && process.env.SP_SMOKE_URL) {
  const ok = async (c, m) => { const result = await c.request(m); assert.equal(result.t, 'ok', JSON.stringify(result)); };
  try {
    const health = await (await fetch(base + '/healthz')).json();
-   assert.equal(health.app, '0.2.1-8p.1');
+   assert.equal(health.app, APP_VERSION);
    for (const path of ['/', '/shared/constants.js', '/js/screens/room.js', '/css/screens/room.css', '/fonts/fonts.css', '/vendor/preact.module.js']) {
      const res = await fetch(base + path); assert.equal(res.status, 200, path);
    }

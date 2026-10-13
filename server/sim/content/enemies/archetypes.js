@@ -7,7 +7,9 @@ import { MOVE_SCALE, COLS, STEALTH_RESTORE } from '../../constants.js';
 import {
   HUSK_REBIRTH, BOOM_RADIUS, POLLUTION_INTERVAL, STEALTH_RESTORE_BY_KEY, DUCK_STEALTH_RESTORE, nthOf, stOf, safe, num, T, elem, hurt,
   areaAllies, areaAlliesInTiles, zone, spawnChildren, stepToward, setHits, hitCount, setForm, absorbArts, auraBuff,
+  unbalancedNow,
 } from './helpers.js';
+import { hypot } from '../../detmath.js';
 
 // ---------------------------------------------------------------------------------------------------------------
 // archetypes
@@ -105,7 +107,7 @@ function pathKeysAhead(e) {
   if (!R || !Array.isArray(R.pts)) return keys;
   let x = e.x, y = e.y;
   for (let i = R.ptIdx ?? 0; i < R.pts.length; i++) {
-    const p = R.pts[i], n = Math.max(1, Math.ceil(Math.hypot(p.x - x, p.y - y) * 4));
+    const p = R.pts[i], n = Math.max(1, Math.ceil(hypot(p.x - x, p.y - y) * 4));
     for (let k = 1; k <= n; k++) keys.add(Math.round(y + ((p.y - y) * k) / n) * COLS + Math.round(x + ((p.x - x) * k) / n));
     x = p.x; y = p.y;
   }
@@ -136,7 +138,10 @@ const nthAttackStatus = (n, key, dur, sil = true) => ({
   attack(c, b, e, a) {
     a.n++;
     if (a.n % n) return;
-    for (const t of c.targets) if (t.alive && dur > 0) b.applyStatus(t, key, { duration: dur, source: e });
+    for (const t of c.targets) {
+      if (!t.alive || !(dur > 0) || (c.targetDeployments && c.targetDeployments.get(t) !== t.deploySeq)) continue;
+      b.applyStatus(t, key, { duration: dur, source: e });
+    }
   },
 });
 
@@ -180,15 +185,17 @@ const deathSpawn = (key, cnt, extra = {}) => ({
 
 /**
  * Death explosion on the allies within r it can select (areaAllies — PRTS 高能源石虫 / 冰爆源石虫 / 卷心籽 死亡爆炸 "…无视迷彩，
- * 不可对空", no 无视无法选择: a 隐匿 ally is spared; the dead enemy blocks nobody).
+ * 不可对空", no 无视无法选择: a 隐匿 ally is spared; the dead enemy blocks nobody). `noAir` (default — all three say so):
+ * a flying ally (the 炎佑 dragon) is skipped; until 0.2.1 it took the blast (community report: 炎祐吃到了不该吃到的地面伤害).
  */
-const deathBoom = ({ scale, type = 'phys', r = BOOM_RADIUS, status = null, sil = true, cond = null }) => ({
+const deathBoom = ({ scale, type = 'phys', r = BOOM_RADIUS, status = null, sil = true, cond = null, noAir = true }) => ({
   sil,
   death(c, b, e, a) {
     if (c.reason !== 'killed' || (cond && !cond(e, a))) return;
     const atk = e.s.atk;
     b.fx('explode', { x: e.x, y: e.y, r, kind: 'deathBoom', id: e.id });
     for (const u of areaAllies(b, e, e.x, e.y, r)) {
+      if (noAir && u.isFlying) continue;
       if (scale > 0) hurt(b, e, u, atk * scale, type);
       if (status && u.alive) b.applyStatus(u, status.key, { duration: status.dur, source: e, value: status.value });
     }
@@ -330,10 +337,11 @@ function rebirthCleanse(b, e) {
  * (no move / attack / skill).
  * `onKo(b, e, a)` runs at once (self-destruct, freeing prisoners …), `during(b, e, a, elapsed)` every tick of it; then the
  * enemy stands up with `hpRatio` of its max HP, `onReborn(b, e, a)` switches the form and `invincible` s of 无敌 follow.
+ * `invincibleUntargetable` opts a verified enemy into hostile selection immunity for that same window (Xi, #510).
  * `a.state`: undefined → 'reborn' → 'form2'. The 'telegraph' fx of the knock-out carries `form: 'reborn'` and the 'revive'
  * fx `form: 'form2'`: models with those clip sets (render/units.js FORMS — 锏, 扎罗, “复仇者”, 杰斯顿) play them.
  */
-function reborn({ dur = 0, hpRatio = 1, invincible = 0, onKo = null, during = null, onReborn = null, key = 'ab:reborn' } = {}) {
+function reborn({ dur = 0, hpRatio = 1, invincible = 0, invincibleUntargetable = false, onKo = null, during = null, onReborn = null, key = 'ab:reborn' } = {}) {
   const finish = (b, e, a) => {
     if (!e.alive || a.state !== 'reborn') return;
     a.state = 'form2';
@@ -341,7 +349,8 @@ function reborn({ dur = 0, hpRatio = 1, invincible = 0, onKo = null, during = nu
     e.profile.noAttack = a.noAtk;
     if (onReborn) safe(b, e, () => onReborn(b, e, a));
     e.hp = Math.max(1, e.s.maxHp * Math.max(0, Math.min(1, hpRatio)));
-    if (invincible > 0) b.addBuff(e, { key: `${key}:inv`, duration: invincible, visible: true, flags: { invulnerable: true } });
+    if (invincible > 0) b.addBuff(e, { key: `${key}:inv`, duration: invincible, visible: true,
+      flags: { invulnerable: true, ...(invincibleUntargetable ? { untargetable: true } : {}) } });
     if (e.route) e.route.pts = null;
     e.atkCd = 0;
     rebirthCooldowns(e);
@@ -353,6 +362,7 @@ function reborn({ dur = 0, hpRatio = 1, invincible = 0, onKo = null, during = nu
       a.state = 'reborn';
       a.t0 = b.time;
       a.noAtk = e.profile.noAttack;
+      e.unbalanceUntil = -Infinity;   // a 重生 is a forced state change: it ends a 失衡 (PRTS 失衡位移机制 「例如复活」)
       rebirthCleanse(b, e);
       e.hp = Math.min(1, e.s.maxHp);
       if (onKo) safe(b, e, () => onKo(b, e, a));
@@ -405,7 +415,7 @@ function unbalanced(onMove) {
       a.px = e.x; a.py = e.y; a.hid = e.hidden;
       if (px == null || hid || e.hidden) return;
       const own = e.s.moveSpeed * MOVE_SCALE * dt * 1.5 + 1e-3;
-      const extra = Math.hypot(e.x - px, e.y - py) - own;
+      const extra = hypot(e.x - px, e.y - py) - own;
       a.lx = px; a.ly = py;                                          // where the move started (direction for onMove)
       if (extra > 0.05) onMove(b, e, a, extra);
     },
@@ -474,6 +484,7 @@ function husk({ hits, delay, stealthy = true, unblock = false, onHusk = null, ke
       if (a.state === 'husk' || !(hits > 0) || !(delay > 0)) return false;   // the husk's knock-out is the real death
       a.state = 'husk';
       a.rebornUntil = b.time + HUSK_REBIRTH;
+      e.unbalanceUntil = -Infinity;   // a 重生 is a forced state change: it ends a 失衡 (PRTS 失衡位移机制 「例如复活」)
       a.noAtk = e.profile.noAttack;
       a.max = a.max ?? e.base.maxHp;
       rebirthCleanse(b, e);
@@ -598,6 +609,7 @@ const skill = (s, fire, { cond = null, sil = false, cd = null, icd = null, id = 
 
 /** Blink past the blocker along the path (弑君者 / 卢西恩). Returns the start position. */
 export function blinkForward(b, e, dist) {
+  if (unbalancedNow(b, e)) return null;                              // 失衡: 「无法…使用技能」 — no blink meanwhile
   const from = { x: e.x, y: e.y };
   const R = e.route;
   let left = dist;
@@ -605,7 +617,7 @@ export function blinkForward(b, e, dist) {
     let i = R.ptIdx;
     while (left > 1e-9 && i < R.pts.length) {
       const p = R.pts[i];
-      const d = Math.hypot(p.x - e.x, p.y - e.y);
+      const d = hypot(p.x - e.x, p.y - e.y);
       if (d <= left) { e.x = p.x; e.y = p.y; left -= d; i++; } else { stepToward(e, p.x, p.y, left); left = 0; }
     }
   } else if (R && R.legs && R.legs[R.legIdx] && R.legs[R.legIdx].r != null) {
@@ -646,13 +658,16 @@ const kitSelfFear = (ab) => [selfFear(ab)];
 const kitEmber = (ab) => [husk({ hits: T(ab, 'Revive[Trigger].prop_max_hp'), delay: T(ab, 'Revive[Trigger].interval') })];
 
 /**
- * 萨卡兹枯朽战士 / 组长 · death: 【污染秽蚀】 (PRTS 天赋 "{{特殊机制|死亡爆炸}}（释放半径2.0，持续8s的【污染秽蚀】）"). Silenced at its
- * death it releases nothing: PRTS 特殊机制 死亡爆炸 "如无特殊说明，此能力默认可沉默…若不处于沉默状态，将会…释放", and the
- * client agrees — its PollutedDie ability is a buff of template `projectile_on_killed` (battle prefab
- * enemy_1267_nhpbr / _2), whose ON_OWNER_KILLED first checks `CheckAbnormalFlag SILENCED` (unset) before it emits the
- * pollution projectile — the template of 高能源石虫's SILENCE-flagged blast too. Its handbook line alone is NORMAL, the one
- * exception to the handbook rule of content/enemies.js (community report of 2026-10-06, item 10: until 0.2.0 a
- * silenced one still poisoned its blockers).
+ * 萨卡兹枯朽战士 / 组长 (`enemy_1267_nhpbr`, `enemy_1267_nhpbr_2`) · death: 【污染秽蚀】 (PollutedDie; PRTS 天赋
+ * "{{特殊机制|死亡爆炸}}（释放半径2.0，持续8s的【污染秽蚀】）"). These two keys are the only enemies with this ability.
+ * Not this fog: 萨卡兹枯朽战车 / 尖端's 秽蚀轰击 (an attack skill, `_ignoreSilence`), 枯朽之种's self-destruct,
+ * 枯朽萃聚使徒's summons, 萨卡兹枯朽前锋 / 辟路前锋's arts while in a 源石污染区, 假想敌：蚀裂's death cloud, and
+ * 高能源石虫's 死亡爆炸.
+ * A death while silenced creates no fog. The owner's official-play recall of 2026-10-12 (GitHub #470) is that
+ * killing one that already shows the silence icon leaves no 污染秽蚀. That recall contradicts the PRTS / in-game
+ * text 「不可沉默」. Both handbook lines are NORMAL ("被击倒时释放污染秽蚀…"), not SILENCE. 0.2.0 already withheld
+ * the fog, from the general 死亡爆炸 line "如无特殊说明，此能力默认可沉默" and the client template
+ * `projectile_on_killed` (DESIGN §25.18.2). The recorded reason is now the owner's recall, against 「不可沉默」.
  */
 const kitPolluted = (ab) => [{
   sil: true,

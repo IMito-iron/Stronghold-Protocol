@@ -26,7 +26,8 @@
 //     rerolls everything and the new slots stay frozen), level-up price = base − rounds elapsed (floor 0).
 //   * Merge: 3 normal copies (风丸 2) on board/hand/temp → 1 elite; equipment returns to the hand; a
 //     reward offer of 3 different free chess of tier min(level+1, 6) is queued (never one operator twice — user
-//     playtest #6 item 19; a short tier tops up from the tier below; pick 1, expires at prep end; an offer earned
+//     playtest #6 item 19; a short tier tops up from the tier below; the player's stocked 自选 of that tier joins,
+//     §30.23; pick 1, expires at prep end; an offer earned
 //     after the prep — SETTLE / Final Assault effects — is kept for the next prep). Where the elite goes (PRTS
 //     卫戍协议/帮助 "发送1名【精锐】状态的该干员至手牌区（若消耗已部署至作战区的干员，则发送至作战区对应位置）", user
 //     playtest #6 follow-up): when a consumed copy stood on the board, onto that copy's tile with its facing (of several,
@@ -73,6 +74,12 @@
 //     mismatch falls back to the defaults) and kept frozen; bots always use the defaults. Match.setLoadout may replace
 //     it during INFO_CHECK only. battleInput() resolves every chess unit to `skillIndex` + `moduleId` (resolveLoadout:
 //     normal chess → moduleId null, elite → uniEquipId | 'none'); m.private exposes `loadout`.
+//   * 潜能 / 练度 (0.2.2, the owner's decision of 2026-10-08 「调配干员里自己设置吧，默认满潜满加成」): the human's checked
+//     `seat.ops` ({ [charId]: { potential, cultivate } }, defaults dropped) is re-checked (checkLoadoutOps) and changed
+//     with the loadout; a missing entry — and every operator of a bot — is 潜能 6, 精英2 Lv.60. battleInput() states both
+//     for every operator the player owns (a chess fielded as itself, an owned 自选 pick: `cultivationFor`), never for a
+//     补位 stand-in or a prototype pick (shared/potential.js cultivationOf); the 自选 summons' hand count follows the
+//     owner's potential (望's 棋子). m.private exposes `ops`; the scouting views carry each unit's `potential` / `cultivate`.
 //   * Operator ownership (0.2.0 补位, the approved plan — owner's decision 2026-10-05): the human's `seat.notOwned` (base
 //     chess ids marked 未持有 on the 干员持有 screen) is re-checked against this match's data (shared/protocol.js
 //     checkNotOwned + a stand-in record in data/backups.json) and fixed for the match (`standIns`; bots own every
@@ -110,7 +117,7 @@
 //                 battleInput
 //   views.js      pieceView, effectsView, m.private (privateView)
 //   diy.js        自选编队: the picks (setDiy), the player's data view, the DIY stock (initDiyStock, poolOf), the shop's
-//                 DIY draws (diyRollEntries), the pick of a piece (diyPickOf)
+//                 DIY draws (diyRollEntries) and the reward / grant draws (diyStockEntries), the pick of a piece (diyPickOf)
 //   common.js     HAND_SIZE, TEMP_SIZE, MAX_OFFER_SLOTS, OK, fail
 
 import { FIELD } from './board.js';
@@ -152,7 +159,9 @@ export class PlayerState {
     this.lastEmoteAt = -Infinity;
     /** operator loadout (DESIGN §16): frozen { [baseChessId]: { skill, module } }, {} = every chess on its defaults */
     this.loadout = Object.freeze({});
-    if (!this.isBot && seat.loadout) this.setLoadout(seat.loadout);
+    // 0.2.2: the per-operator 潜能 / 练度 ({} = every operator 潜能 6, 精英2 Lv.60 — bots always)
+    this.ops = Object.freeze({});
+    if (!this.isBot && (seat.loadout || seat.ops)) this.setLoadout(seat.loadout ?? null, seat.ops ?? null);
     /**
      * 补位 (0.2.0): the base chess ids this player fields as their stand-ins — the seat's not-owned list when the match
      * started, re-checked against this match's data; frozen, sorted; [] = every operator owned (bots always)
@@ -201,6 +210,13 @@ export class PlayerState {
     this.effects = [];
     /** active bounties: { id, card, roundsLeft, chooser } */
     this.bounties = [];
+    /**
+     * The open personal choice of the Art 教鞭 (Match.offerBountyChoice): up to three cards.bounty entries the owner picks one
+     * of with `g.choice { idx, choiceId }` — m.private only; Ready is refused while it is open, the prep's deadline (or the
+     * bot) resolves it
+     * @type {null | { id: string, round: number, sourceItemId: string, cards: any[] }}
+     */
+    this.personalChoice = null;
     /** free-form counters for content (ctx.counter / setCounter) */
     this.counters = {};
     /** per-round counters (reset at round start) */
