@@ -21,6 +21,7 @@ import { openStats } from './stats.js';
 import { SettingsButton } from '../ui/settings.js';
 import { PwaInstallButton } from '../ui/device.js';
 import { LoadoutButton } from './loadout.js';
+import { RoomBrowser } from '../ui/roomBrowser.js';
 import { net, identity } from '../net.js';
 import { store, useStore, shallowEqual, loadPref, savePref } from '../store.js';
 import { getConfig, getMode, getStage, useData } from '../data.js';
@@ -380,5 +381,6 @@ export function LobbyScreen() {
         </div>
       </section>
     </div>
+    <${RoomBrowser} />
   </div>`;
 }

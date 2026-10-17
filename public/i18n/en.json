@@ -1800,5 +1800,18 @@
   "其余 {n} 个已移到 plugins/_removed/。": "The other {n} {n|was|were} moved to plugins/_removed/.",
   "已移到 plugins/_removed/：{n} 个插件": "Moved to plugins/_removed/: {n} {n|plugin|plugins}",
   "选中「{name}」": "Select \"{name}\"",
-  "符号链接的插件文件夹不能在这里删除。": "A plugin folder that is a symbolic link cannot be deleted here."
+  "符号链接的插件文件夹不能在这里删除。": "A plugin folder that is a symbolic link cannot be deleted here.",
+  "房间列表": "Room list",
+  "展开房间列表": "Show the room list",
+  "收起房间列表": "Hide the room list",
+  "暂无正在进行的同盟": "No open Alliances right now",
+  "游戏中": "In game",
+  "加入": "Join",
+  "该同盟已开始模拟，无法加入（可以观战）": "That Alliance has already started — you can watch instead",
+  "该同盟已解散": "That Alliance no longer exists",
+  "该同盟已满": "That Alliance is full",
+  "观战席已满（每个同盟最多 {MAX_SPECTATORS} 名）": "No spectator seat left (at most {MAX_SPECTATORS} per Alliance)",
+  "你已经在另一个同盟中，请先离开": "You are already in an Alliance — leave it first",
+  "未命名": "Unnamed",
+  "AI × {n}": "AI × {n}"
 }

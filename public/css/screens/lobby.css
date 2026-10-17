@@ -238,3 +238,122 @@
 .create-box { margin-top: .3rem; display: flex; flex-direction: column; gap: .12rem; }
 .create-box .btn--xl { height: .92rem; font-size: calc(.32 * var(--t)); letter-spacing: .3em; }
 .create-box__hint { display: flex; align-items: center; justify-content: center; min-height: .3rem; font-size: calc(.14 * var(--t)); color: var(--text-lo); }
+
+/* ---- room browser (bottom-right, collapsible; server/lobby.js S2C lobby.rooms) ------------------------ */
+.room-browser {
+  position: fixed;
+  right: .46rem;
+  bottom: .46rem;
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  width: 3.55rem;
+  max-width: calc(100vw - .92rem);
+  max-height: min(4.6rem, calc(100vh - 2.2rem));
+  overflow: hidden;
+  background: var(--bg-glass);
+  border: 1px solid var(--line-2);
+  border-radius: .1rem;
+  box-shadow: 0 .14rem .42rem rgba(0, 0, 0, .5);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+.room-browser__head {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: .12rem;
+  padding: .15rem .2rem;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-2);
+  color: var(--mint-400);
+  font: inherit;
+  font-size: calc(.15rem * var(--t));
+  font-weight: 800;
+  letter-spacing: .06em;
+  cursor: pointer;
+}
+.room-browser__head:hover { background: var(--bg-3); }
+.room-browser.is-collapsed .room-browser__head { border-bottom: 0; }
+.room-browser__icon { width: .18rem; height: .18rem; }
+.room-browser__title { flex: 1 1 auto; text-align: left; }
+.room-browser__count {
+  min-width: .28rem;
+  padding: 0 .06rem;
+  border-radius: .06rem;
+  background: var(--mint-a20);
+  color: var(--mint-400);
+  font-size: calc(.13rem * var(--t));
+  text-align: center;
+}
+.room-browser__chev { width: .16rem; height: .16rem; transition: transform var(--t-med); }
+.room-browser:not(.is-collapsed) .room-browser__chev { transform: rotate(90deg); }
+.room-browser__list { display: flex; flex-direction: column; gap: .08rem; padding: .08rem; overflow-y: auto; }
+.room-browser__empty { padding: .18rem .12rem; color: var(--text-md, #b9c6c0); font-size: calc(.14rem * var(--t)); text-align: center; }
+.room-browser__row {
+  display: flex;
+  flex-direction: column;
+  gap: .07rem;
+  padding: .1rem .12rem;
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: .06rem;
+}
+.room-browser__row.is-in-match { opacity: .78; }
+.room-browser__meta { display: flex; align-items: center; gap: .08rem; min-width: 0; }
+.room-browser__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-hi, #e8f2ee);
+  font-size: calc(.16rem * var(--t));
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.room-browser__tag {
+  flex: 0 0 auto;
+  padding: 0 .06rem;
+  border-radius: .04rem;
+  background: var(--red-a20, rgba(231, 49, 24, .22));
+  color: var(--red-premium, #ff5454);
+  font-size: calc(.11rem * var(--t));
+}
+.room-browser__state {
+  flex: 0 0 auto;
+  padding: 0 .07rem;
+  border-radius: .04rem;
+  background: var(--mint-a20);
+  color: var(--mint-400);
+  font-size: calc(.11rem * var(--t));
+  font-weight: 700;
+}
+.room-browser__row.is-in-match .room-browser__state {
+  background: var(--amber-a20, rgba(246, 163, 41, .2));
+  color: var(--amber, #f6a329);
+}
+.room-browser__players { display: flex; flex-wrap: wrap; align-items: center; gap: .06rem; }
+.room-browser__player {
+  max-width: 1.5rem;
+  overflow: hidden;
+  padding: 0 .08rem;
+  border-radius: .05rem;
+  background: var(--bg-3);
+  color: var(--text-md, #b9c6c0);
+  font-size: calc(.12rem * var(--t));
+  line-height: .2rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.room-browser__player.is-bot { display: inline-flex; align-items: center; gap: .03rem; color: var(--text-dim, #8a978f); }
+.room-browser__player.is-bot svg { width: .12rem; height: .12rem; }
+.room-browser__seats { margin-left: auto; color: var(--text-dim, #8a978f); font-size: calc(.12rem * var(--t)); }
+.room-browser__spec { display: inline-flex; align-items: center; gap: .03rem; color: var(--text-dim, #8a978f); font-size: calc(.12rem * var(--t)); }
+.room-browser__spec svg { width: .13rem; height: .13rem; }
+.room-browser__actions { display: flex; gap: .08rem; }
+.room-browser__actions .btn { flex: 1 1 0; min-width: 0; }
+@media (max-width: 900px), (max-height: 480px) {
+  .room-browser { right: .24rem; bottom: .24rem; width: 2.9rem; max-height: 3.4rem; }
+  .room-browser__title { font-size: calc(.14rem * var(--t)); }
+}

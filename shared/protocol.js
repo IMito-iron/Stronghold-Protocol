@@ -532,6 +532,12 @@ export const C2S = {
 export const S2C = [
   'welcome', 'ok', 'error', 'pong',
   'room.state', 'room.closed',
+  // lobby.rooms { rooms: [{ code, hostName, mode, difficulty, inMatch, modded, players: [name], bots, seatsUsed,
+  // seatsMax, spectators, spectatorsMax }] } — the lobby screen's room browser (server/lobby.js sendRooms): the open
+  // rooms, sent to a session in no room right after its hello and again (debounced) on every room change. `code` is
+  // the join/spectate key the buttons pass back and is never rendered; `players` holds the human seats' names
+  // (DESIGN §8.1).
+  'lobby.rooms',
   'm.public', 'm.private', 'm.field', 'm.toast', 'm.ticker', 'm.emote', 'm.result',
   // m.layer { playerId, bondId, add } — own live prep layer gain; ephemeral, never replayed on resync.
   'm.layer',

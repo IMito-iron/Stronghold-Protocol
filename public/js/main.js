@@ -240,6 +240,8 @@ function wireNet() {
   net.on('replaced', () => toast(t('该身份已在其他页面登录，本页已断开'), 'warn', { ttl: 6000 }));
   net.on('unhandledError', (err) => toastError(err));
   net.on('room.state', onRoomState);
+  // the lobby screen's room browser (server/lobby.js sendRooms): the open Alliances, refreshed on every change
+  net.on('lobby.rooms', (msg) => store.patch('ui', { rooms: Array.isArray(msg.rooms) ? msg.rooms : [] }));
   net.on('room.closed', (msg) => {
     backToLobby();
     const known = Object.hasOwn(CLOSE_REASON, String(msg.reason)) ? CLOSE_REASON[msg.reason] : null;

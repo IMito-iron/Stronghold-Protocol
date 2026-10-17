@@ -753,6 +753,49 @@ describe('websocket lobby', () => {
     assert.equal(started.seats.filter(Boolean).length, 8);
   });
 
+  test('room browser: lobby.rooms names rooms after their host, lists players and flips inMatch', async () => {
+    const watcher = await pool.player('Watcher');
+    // a snapshot right after hello (earlier tests may leave rooms in their reconnect grace: only check its shape)
+    const first = await watcher.waitFor('lobby.rooms');
+    assert.ok(Array.isArray(first.rooms));
+    assert.ok(!first.rooms.some((r) => r.hostName === 'HostRooms'));
+
+    const host = await pool.player('HostRooms');
+    const st = await createRoom(host, 'coop', 'HARD');
+    const listed = await watcher.waitFor('lobby.rooms', (m) => m.rooms.some((r) => r.code === st.code));
+    const row = listed.rooms.find((r) => r.code === st.code);
+    assert.equal(row.hostName, 'HostRooms');
+    assert.deepEqual(row.players, ['HostRooms']);
+    assert.equal(row.inMatch, false);
+    assert.equal(row.seatsMax, MAX_SEATS);
+    assert.equal(row.spectatorsMax, MAX_SPECTATORS);
+
+    // a second human appears by name; a bot is counted, never named as a player
+    const guest = await pool.player('GuestRooms');
+    await joinRoom(guest, st.code);
+    await watcher.waitFor('lobby.rooms', (m) => (m.rooms.find((r) => r.code === st.code)?.players.length || 0) === 2);
+    await expectOk(host, { t: 'room.addBot' });
+    const withBot = await watcher.waitFor('lobby.rooms', (m) => (m.rooms.find((r) => r.code === st.code)?.bots || 0) === 1);
+    assert.deepEqual(withBot.rooms.find((r) => r.code === st.code).players, ['HostRooms', 'GuestRooms']);
+
+    // the match flips inMatch: the client disables 加入, the server refuses a late join, 观战 is still free
+    await expectOk(host, { t: 'room.ready', ready: true });
+    await expectOk(guest, { t: 'room.ready', ready: true });
+    await expectOk(host, { t: 'room.start' });
+    await watcher.waitFor('lobby.rooms', (m) => m.rooms.find((r) => r.code === st.code)?.inMatch === true);
+    const late = await pool.player('LateRooms');
+    await expectError(late, { t: 'room.join', code: st.code }, ERR.ROOM_STARTED);
+    const spec = await pool.player('SpecRooms');
+    await expectOk(spec, { t: 'room.spectate', code: st.code });
+    await watcher.waitFor('lobby.rooms', (m) => (m.rooms.find((r) => r.code === st.code)?.spectators || 0) === 1);
+
+    // leave nothing open for the later tests (the fuzz test's fixed sequence reads the open room codes)
+    await expectOk(spec, { t: 'room.leave' });
+    await expectOk(guest, { t: 'room.leave' });
+    await expectOk(host, { t: 'room.leave' });
+    await watcher.waitFor('lobby.rooms', (m) => !m.rooms.some((r) => r.code === st.code));
+  });
+
   test('room full, solo rooms admit one human and no AI', async () => {
     const host = await pool.player('H');
     const st = await createRoom(host);
@@ -1790,12 +1833,13 @@ describe('match result replay', () => {
     await back.hello('Guest', guest.token);
     assert.equal((await back.waitFor('room.closed')).reason, 'timeout');
     assert.equal((await back.waitFor('m.result')).playerId, guest.id);
-    assert.deepEqual(order(back), ['room.closed', `m.public:${PHASE.RESULT}`, 'm.result']);
+    // `lobby.rooms` is the room browser's snapshot on hello; this test pins the replay frames
+    assert.deepEqual(order(back).filter((t) => t !== 'lobby.rooms'), ['room.closed', `m.public:${PHASE.RESULT}`, 'm.result']);
     // delivered once
     await back.terminate();
     const again = await pool.connect();
     await again.hello('Guest', guest.token);
-    await again.expectNone(null, (m) => m.t !== 'welcome', 300);
+    await again.expectNone(null, (m) => m.t !== 'welcome' && m.t !== 'lobby.rooms', 300);
   });
 
   test('real Match: a human who is away when the match finishes gets its m.result on resume', async () => {

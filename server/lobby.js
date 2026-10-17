@@ -367,6 +367,8 @@ export class Lobby {
     this.opts = { ...LOBBY_DEFAULTS, ...options };
     /** @type {Map<string, Room>} */
     this.rooms = new Map();
+    /** @type {NodeJS.Timeout | null} coalesced room-browser broadcast (S2C lobby.rooms) */
+    this.roomsTimer = /** @type {NodeJS.Timeout | null} */ (null);
     /** @type {Map<string, NodeJS.Timeout>} lobby grace timers by playerId */
     this.graceTimers = new Map();
     /** @type {Map<string, NodeJS.Timeout>} deferred (coalesced) resyncs by playerId */
@@ -473,6 +475,8 @@ export class Lobby {
    * @param {{ resumed: boolean, repeat: boolean }} info
    */
   onHello(session, { resumed, repeat }) {
+    // the lobby screen's room browser: a first hello is its only snapshot before the next room change
+    if (!session.roomCode) this.sendRooms(session);
     if (!resumed && !repeat) return;
     const room = this.roomOf(session);
     if (!room) {
@@ -1664,6 +1668,7 @@ export class Lobby {
     if (room.disposed) return;
     room.disposed = true;
     if (this.rooms.get(room.code) === room) { this.trustedRuntime?.event('roomClosed',{room:room.toState()}); this.rooms.delete(room.code); }
+    this.scheduleRooms();
     const ctx = room.matchCtx;
     room.match = null;
     room.matchCtx = null;
@@ -1716,6 +1721,71 @@ export class Lobby {
     }
   }
 
+  /**
+   * The open rooms as the lobby screen's room browser shows them (S2C `lobby.rooms`, DESIGN §8.1): the host's name is
+   * the room's name, `players` holds the human seats' names, and `inMatch` says whether a running match makes 加入
+   * impossible (观战 stays possible in either case). `code` is the alliance key the browser's buttons pass back — it
+   * is never rendered.
+   * @returns {{ code: string, hostName: string, mode: string, difficulty: string, inMatch: boolean, modded: boolean,
+   *   players: string[], bots: number, seatsUsed: number, seatsMax: number, spectators: number,
+   *   spectatorsMax: number }[]}
+   */
+  roomsList() {
+    const out = [];
+    for (const room of this.rooms.values()) {
+      const host = room.seatOf(room.hostId || '');
+      const players = [];
+      let bots = 0;
+      let seatsUsed = 0;
+      for (const seat of room.seats) {
+        if (!seat || seat.left) continue;
+        seatsUsed += 1;
+        if (seat.isBot) bots += 1;
+        else players.push(seat.name);
+      }
+      out.push({
+        code: room.code,
+        hostName: host ? host.name : '',
+        mode: room.mode,
+        difficulty: room.difficulty,
+        inMatch: !!room.match,
+        modded: !!room.modded,
+        players,
+        bots,
+        seatsUsed,
+        seatsMax: MAX_SEATS,
+        spectators: room.spectators.length,
+        spectatorsMax: MAX_SPECTATORS,
+      });
+    }
+    return out;
+  }
+
+  /** Send the room list to one session. @param {import('./net.js').Session} session */
+  sendRooms(session) {
+    if (!session || !session.connected || !session.ws) return;
+    sendSession(session, { t: 'lobby.rooms', rooms: this.roomsList() });
+  }
+
+  /** Coalesced room-list broadcast: a burst of room changes becomes one frame (a change is a room-state broadcast). */
+  scheduleRooms() {
+    if (this.roomsTimer) return;
+    this.roomsTimer = setTimeout(() => {
+      this.roomsTimer = null;
+      this.broadcastRooms();
+    }, 120);
+    this.roomsTimer.unref?.();
+  }
+
+  /** The room list to every connected session that is in no room — the only place the browser is mounted. */
+  broadcastRooms() {
+    const rooms = this.roomsList();
+    for (const session of this.registry.all()) {
+      if (session.roomCode || !session.connected || !session.ws) continue;
+      sendSession(session, { t: 'lobby.rooms', rooms });
+    }
+  }
+
   broadcastState(room) {
     if (room.disposed) return;
     if (this.trustedRuntime) {
@@ -1731,6 +1801,7 @@ export class Lobby {
     }
     const data = encode(room.toState());
     for (const session of this.memberSessions(room)) sendRaw(session.ws, data);
+    this.scheduleRooms();
   }
 
   sendState(room, session) {

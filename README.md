@@ -2,9 +2,9 @@
 
 《明日方舟》季节性自走棋塔防玩法「卫戍协议：盟约」的**非官方同人复刻**：浏览器即开即玩，单人或 1–8 人联机合作。
 
-![version](https://img.shields.io/badge/version-0.3.0--8p.1-2ea44f)
+![version](https://img.shields.io/badge/version-0.3.0--8p.2-2ea44f)
 
-本 fork 的 **0.3.0-8p.1** 基于上游 v0.3.0：真人与 AI 合计最多 8 人，另有 2 个观战席。Boss 血量按开战时存活人数计算，最多 8 人；保留上游修复、多语言、自选编队和干员持有功能。上游：[sganggs/Stronghold-Protocol](https://github.com/sganggs/Stronghold-Protocol)。
+本 fork 的 **0.3.0-8p.2** 基于上游 v0.3.0：真人与 AI 合计最多 8 人，另有 2 个观战席。Boss 血量按开战时存活人数计算，最多 8 人；保留上游修复、多语言、自选编队和干员持有功能。上游：[sganggs/Stronghold-Protocol](https://github.com/sganggs/Stronghold-Protocol)。
 ![license](https://img.shields.io/badge/code%20license-GPL--3.0--or--later-blue)
 ![node](https://img.shields.io/badge/node-22%20%7C%2024-339933)
 
