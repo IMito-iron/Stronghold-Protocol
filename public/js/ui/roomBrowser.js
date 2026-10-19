@@ -13,7 +13,7 @@
 // exposed the counts; this adds the names (docs/design/network.md).
 
 import { useState } from '../../vendor/hooks.module.js';
-import { html, Button, Icon } from './components.js';
+import { html, Button, Icon, confirmDialog } from './components.js';
 import { net } from '../net.js';
 import { useStore, shallowEqual, loadPref, savePref } from '../store.js';
 import { toast, toastError } from './toasts.js';
@@ -26,6 +26,7 @@ const PREF = 'lobby.roomsCollapsed';
 /**
  * One row of the S2C `lobby.rooms` frame (server/lobby.js roomsList).
  * @typedef {{ code: string, hostName: string, mode: string, difficulty: string, inMatch: boolean, modded: boolean,
+ *   test: boolean,
  *   players: string[], bots: number, seatsUsed: number, seatsMax: number, spectators: number,
  *   spectatorsMax: number }} RoomRow
  */
@@ -62,9 +63,21 @@ export function RoomBrowser() {
   const act = async (kind, room) => {
     if (busy) return;
     setBusy(kind + ':' + room.code);
+    /** @param {boolean} [testAck] */
+    const send = (testAck = false) => net.request(kind === 'join' ? 'room.join' : 'room.spectate',
+      { code: room.code, ...(testAck ? { testAck: true } : {}) });
     try {
-      if (kind === 'join') await net.request('room.join', { code: room.code });
-      else await net.request('room.spectate', { code: room.code });
+      try {
+        await send();
+      } catch (err) {
+        if (err?.code !== ERR.TEST_CONFIRM) throw err;
+        // 0.3.1 test rooms: a seat in one records nothing, so the server asks for an explicit ack (joinKnown's flow)
+        const text = kind === 'spectate'
+          ? t('这是测试房间，不计入任何记录。确认观战？')
+          : t('这是测试房间，不计入任何记录。确认加入？');
+        if (!(await confirmDialog({ title: t('测试'), text }))) return;
+        await send(true);
+      }
     } catch (err) {
       const code = err?.code;
       if (code === ERR.ROOM_NOT_FOUND) toast(t('该同盟已解散'), 'warn');
@@ -93,6 +106,7 @@ export function RoomBrowser() {
             <div class="room-browser__meta">
               <span class="room-browser__name" title=${room.hostName}>${room.hostName || t('未命名')}</span>
               ${room.modded ? html`<span class="room-browser__tag">${t('非官方')}</span>` : null}
+              ${room.test ? html`<span class="room-browser__tag is-test">${t('测试')}</span>` : null}
               <span class="room-browser__state">${room.inMatch ? t('游戏中') : t('等待中')}</span>
             </div>
             <div class="room-browser__players">

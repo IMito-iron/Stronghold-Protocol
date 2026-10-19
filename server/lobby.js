@@ -1875,6 +1875,7 @@ export class Lobby {
         difficulty: room.difficulty,
         inMatch: !!room.match,
         modded: !!room.modded,
+        test: !!room.test,
         players,
         bots,
         seatsUsed,

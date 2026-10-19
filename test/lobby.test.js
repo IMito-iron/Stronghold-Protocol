@@ -767,6 +767,7 @@ describe('websocket lobby', () => {
     assert.equal(row.hostName, 'HostRooms');
     assert.deepEqual(row.players, ['HostRooms']);
     assert.equal(row.inMatch, false);
+    assert.equal(row.test, false);
     assert.equal(row.seatsMax, MAX_SEATS);
     assert.equal(row.spectatorsMax, MAX_SPECTATORS);
 

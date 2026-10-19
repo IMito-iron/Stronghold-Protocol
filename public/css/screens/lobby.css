@@ -323,6 +323,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.room-browser__tag.is-test { background: var(--amber-a20, rgba(246, 163, 41, .2)); color: var(--amber, #f6a329); }
 .room-browser__tag {
   flex: 0 0 auto;
   padding: 0 .06rem;
