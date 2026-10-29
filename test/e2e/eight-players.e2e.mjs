@@ -45,8 +45,12 @@ try {
    if (i === 0) {
      await p.waitForSelector('.lobby-screen');
      await clickText(p, '.mode-card', '同盟模拟');
+     await p.waitForSelector('[data-testid="alliance-create"]');
+     await p.click('[data-testid="alliance-create"]');
+     await p.waitForSelector('.rs-pill__diff');
+     await p.click('.rs-pill__diff');
      await clickText(p, '.diff-card', '险境模拟');
-     await clickText(p, '.create-box button', '创建同盟');
+     await clickText(p, '.proto-foot button', '确认');
    }
    await p.waitForFunction(() => !!globalThis.__SP__.store.get().room?.code);
    code = (await state(p)).room.code;
@@ -81,18 +85,18 @@ try {
      console.log('progress', states.map(s => [s.pub?.phase, s.pub?.round, s.result, s.runner?.kind]));
      lastStatus = Date.now();
    }
-   if (!teamChecked && await host.$('.team')) {
-     const rows = await host.$$eval('.team__row', es => es.length);
-     assert.equal(rows, count);
-     await host.screenshot({ path: out + '/' + scenario + '-' + count + '-team.png' });
-     teamChecked = true;
-   }
    if (scenario === 'normal' && !disconnected) {
      const last = states.at(-1).runner;
      if (last?.authoritative && !last.done && last.kind === 'normal') {
        await pages.at(-1).evaluate(() => globalThis.__SP__.net.reconnectNow());
        disconnected = true;
      }
+   }
+   if (!teamChecked && await host.$('.team')) {
+     const rows = await host.$$eval('.team__row', es => es.length);
+     assert.equal(rows, count);
+     await host.screenshot({ path: out + '/' + scenario + '-' + count + '-team.png' });
+     teamChecked = true;
    }
    if (scenario === 'normal' ? states.every(s => s.pub?.round >= 2) : states.every(s => s.result)) { finished = true; break; }
    await sleep(300);
