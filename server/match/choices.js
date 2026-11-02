@@ -134,15 +134,33 @@ function itemCard(gd, id) {
 }
 
 /**
+ * Fork (eight-player balance, 2026-11-03): the co-op draft's card count — the official 6 at four seats, scaled by the
+ * seats above four (`Math.round(6 × seats / 4)`: 5 → 8, 6 → 9, 7 → 11, 8 → 12), so every seat can pick (cards ≥ seats)
+ * and the choices per seat stay the official 1.5. Solo keeps its 3; `economy.teamSizeScaling` ({ from, enabled }) tunes
+ * it. The owner's request: eight players share a draft built for four.
+ * @param {import('./gamedata.js').GameData} gd @param {number} base the official count @param {number} [players] alive seats
+ */
+export function draftCardCount(gd, base, players = 0) {
+  if (gd.isSolo) return base;
+  const ps = gd.economy && gd.economy.teamSizeScaling;
+  if (ps && ps.enabled === false) return base;
+  const from = ps && Number.isInteger(ps.from) && ps.from > 0 ? ps.from : 4;
+  const n = Number.isInteger(players) && players > 0 ? players : 0;
+  return n > from ? Math.max(base, n, Math.round((base * n) / from)) : base;
+}
+
+/**
  * Build the draft cards for an SP round.
+ * @param {{ players?: number }} [opts] `players` = the alive seats at the draft (fork scaling; absent = four-seat count)
  * @returns {{ family: string, name: string, desc: string, eventId: string|null, cards: object[] } | null}
  */
-export function generateDraft(gd, rng, round, { stageId = null, bondAvailable = null, itemAvailable = null } = {}) {
+export function generateDraft(gd, rng, round, { stageId = null, bondAvailable = null, itemAvailable = null, players = 0 } = {}) {
   const sch = scheduleFor(gd, round);
   const fams = Array.isArray(sch.families) && sch.families.length ? sch.families.map((f) => [f.family, f.weight]) : [['supply', 1]];
   let family = weightedPick(rng, fams) || 'supply';
-  const n = Number.isInteger(sch.cards) && sch.cards > 0 ? Math.min(sch.cards, 6) : formatCount(gd);
-  const opts = { stageId, bondAvailable, round, itemAvailable };
+  const baseCards = Number.isInteger(sch.cards) && sch.cards > 0 ? Math.min(sch.cards, 6) : formatCount(gd);
+  const n = draftCardCount(gd, baseCards, players);
+  const opts = { stageId, bondAvailable, round, itemAvailable, repeats: n > baseCards };
   let cards = buildCards(gd, rng, family, n, sch, opts);
   if (!cards.length && family !== 'supply') { family = 'supply'; cards = buildCards(gd, rng, family, n, sch, opts); }
   if (!cards.length) return null;
@@ -311,7 +329,7 @@ function structuredBounty(rng, kind, spec, byId) {
  * eligible cards of that kind when it falls short (test fixtures with a restricted card list), shuffled into place —
  * the official card positions vary — and cut to `n` (solo 3 [ASSUMED]).
  */
-function bountyDraftCards(gd, rng, n, sch, round) {
+function bountyDraftCards(gd, rng, n, sch, round, { repeats = false } = {}) {
   const kind = typeof sch.bountyDraft === 'string' ? sch.bountyDraft : bountyDraftKind(round);
   const all = Array.isArray(gd.choices.cards && gd.choices.cards.bounty) ? gd.choices.cards.bounty : [];
   const eligible = all.filter((c) => c && draftBounty(c, kind) && gd.enemy(c.enemyKey));
@@ -320,6 +338,12 @@ function bountyDraftCards(gd, rng, n, sch, round) {
   const out = spec ? structuredBounty(rng, kind, spec, byId) : [];
   const taken = new Set(out);
   if (out.length < n) out.push(...drawDistinct(rng, eligible, n - out.length, taken));
+  // Fork (eight seats): only a draft scaled above the official count repeats an official list shorter than it — the same
+  // bounty offered twice, two cards and two picks (the client goes by idx, like 机密商店's duplicate items). At four
+  // seats a short (test-fixture) list stays short, as before.
+  if (repeats) while (out.length < n && eligible.length) { // loop-cap: out length and n, eligible non-empty
+    out.push(eligible[Math.floor(rng() * eligible.length)]);
+  }
   return rng.shuffle(out).slice(0, n).map((c) => bountyCard(gd, c));
 }
 
@@ -342,7 +366,11 @@ export function shopDraftCards(gd, rng, n, round = null, itemAvailable = null) {
     return free(eligibleItems(gd, 1, 6));
   };
   const out = [];
-  for (const slot of slots) {
+  // Fork (eight seats): the six official slots repeat when the draft is scaled above six cards (proportionally more of
+  // each slot: two VI items per six cards, four per twelve)
+  const draws = Math.max(slots.length, n);
+  for (let d = 0; d < draws; d++) {
+    const slot = slots[d % slots.length];
     const kinds = Object.entries(slot).filter(([k]) => k === 'coin' ? !!coin : Number.isInteger(Number(k)));
     const kind = weightedPick(rng, kinds);
     if (kind == null) continue;
@@ -384,8 +412,8 @@ export function tacticDraftCards(gd, rng, n, { stageId = null, bondAvailable = n
   return out;
 }
 
-function buildCards(gd, rng, family, n, sch, { stageId = null, bondAvailable = null, round = 1, itemAvailable = null } = {}) {
-  if (family === 'bounty') return bountyDraftCards(gd, rng, n, sch, round);
+function buildCards(gd, rng, family, n, sch, { stageId = null, bondAvailable = null, round = 1, itemAvailable = null, repeats = false } = {}) {
+  if (family === 'bounty') return bountyDraftCards(gd, rng, n, sch, round, { repeats });
   if (family === 'shop') {
     const cards = shopDraftCards(gd, rng, n, round, itemAvailable);
     if (cards) return cards;

@@ -599,7 +599,9 @@ describe('drafts', () => {
     const sp2 = normalizeSp({ cards: [{}, {}], order: ['b', 'a'], turn: 0, picks: [{ playerId: 'b', idx: 1 }, { playerId: 'x', idx: 9 }] }, players);
     assert.equal(sp2.turnPid, 'b'); assert.equal(sp2.cards[1].takenBy, 'b'); assert.equal(sp2.pickOf.has('x'), false);
     assert.equal(normalizeSp(null), null);
-    assert.equal(normalizeSp({ cards: new Array(9).fill({}) }).cards.length, 6, 'at most 6 cards');
+    // fork (eight seats): the server scales the draft above four players; the client no longer cuts it to six
+    assert.equal(normalizeSp({ cards: new Array(9).fill({}) }).cards.length, 9, 'the scaled nine-card draft is not cut to six');
+    assert.equal(normalizeSp({ cards: new Array(30).fill({}) }).cards.length, 24, 'the safety cap is 24 cards');
   });
   test('personal choice: only the living recipient in the current PREP, independent of the public draft', () => {
     const pub = { phase: PHASE.PREP, round: 14, sp: { family: 'supply', cards: ['global'] } };

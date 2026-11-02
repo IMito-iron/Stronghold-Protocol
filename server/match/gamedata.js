@@ -316,6 +316,21 @@ export class GameData {
    * Copies of a base chess in the shared pool — and, for a DIY slot, of a slotted 自选 piece in its player's own stock
    * (player/diy.js buildDiyStock).
    */
+  /**
+   * Fork (eight-player balance, 2026-11-03): the shared stock grows with the seats above `from` (default 4), so every
+   * player keeps the copies-per-player four players have. The official pool is one team pool whatever the team size;
+   * at eight seats each player would draw from half the copies of a four-seat game (and the high difficulties' banned
+   * chess shrink it further: the owner's request). `economy.teamSizeScaling` ({ from, enabled }) tunes it; solo is 1.
+   */
+  teamScale() {
+    if (this.isSolo) return 1;
+    const ps = this.economy.teamSizeScaling;
+    if (ps && ps.enabled === false) return 1;
+    const from = ps && Number.isInteger(ps.from) && ps.from > 0 ? ps.from : 4;
+    const n = Number.isInteger(this.teamSize) ? this.teamSize : 0;
+    return n > from ? n / from : 1;
+  }
+
   poolCopies(baseId) {
     const ov = this.economy.poolCopiesOverrides;
     const tier = this.tierOf(baseId);
@@ -326,7 +341,7 @@ export class GameData {
     // size) and each player's private 自选 stock alike — the maintainer's decision of 2026-10-15 (GitHub #650): with
     // the shared pool doubled and the 自选 stock not, a 自选 operator was diluted in the copy-weighted rolls.
     const multiplier = this.isSolo ? 1 : posIntOr(this.economy.coopPoolMultiplier, 1);
-    return base * multiplier;
+    return Math.round(base * multiplier * this.teamScale());
   }
 
   /** Normal equipment copies in the shared pool; effect-only items have no shop stock limit. */
@@ -334,7 +349,7 @@ export class GameData {
     const base = this.baseIdOf(id), rec = this.item(base);
     if (!rec || !isShopItem(rec)) return null;
     const count = this.economy.itemPoolCopiesOverrides?.[base] ?? this.economy.itemPoolCopies?.[rec.tier];
-    return Number.isInteger(count) && count >= 0 ? count : null;
+    return Number.isInteger(count) && count >= 0 ? Math.round(count * this.teamScale()) : null;
   }
 
   /** Whether a fixed trait gift may be produced beyond stock (including the advanced version of that item). */

@@ -61,7 +61,8 @@ export function normalizeSp(sp, players = []) {
   if (!isObj(sp)) return null;
   const ids = (Array.isArray(players) ? players : []).filter(isObj).map((p) => p.playerId);
   const order = Array.isArray(sp.order) && sp.order.length ? sp.order.filter((x) => typeof x === 'string') : ids;
-  const cards = (Array.isArray(sp.cards) ? sp.cards : []).slice(0, 6).map((c, idx) => {
+  // Fork (eight seats): the server scales the draft above four players (up to 12); 24 is only a safety cap
+  const cards = (Array.isArray(sp.cards) ? sp.cards : []).slice(0, 24).map((c, idx) => {
     const card = typeof c === 'string' ? { id: c } : isObj(c) ? { ...c } : {};
     return { ...card, idx, takenBy: typeof card.takenBy === 'string' ? card.takenBy : null };
   });

@@ -362,6 +362,27 @@ These do not alter the default rules above. See
 
 The owner requests up to eight human/bot seats, plus two independent spectator seats. Boss HP follows v0.2.1 per-alive-player scaling, capped at eight. Disconnected humans and bots count; eliminated and departed players do not. Pairing remains two players per field, with one solo field for an odd count. Other balance rules and single-player behavior are unchanged.
 
+### Fork: balance above four players (2026-11-03)
+
+The owner's request: eight players share one card stock and one 机变 draft built for four, and the high difficulties'
+banned chess shrink the stock further. From 0.3.3-8p.2 a co-op match with more than four seats scales:
+
+- **the shared chess pool** by the seats above four: `gamedata.poolCopies` × `teamScale()` (seats / 4 above
+  `economy.teamSizeScaling.from`, default 4), so 8 seats = 4× the base copies (4 seats = the official 2×) and the
+  copies per player stay what four players had. The 自选 stock (`player/diy.js`) follows the same multiplier. The
+  shared equipment stock (`itemPoolCopies`, which has no co-op multiplier) is × seats / 4 above four (8 seats = 2×).
+  Copies are rounded to integers.
+- **the 机变 draft**: the official six cards at four seats scale by `Math.round(6 × seats / 4)` (5 → 8, 6 → 9,
+  7 → 11, 8 → 12) — cards ≥ seats, so every seat picks, at the official 1.5 cards per seat. The count follows the
+  seats alive at that draft. A bounty draft's official list shorter than the count repeats a card (each offering its
+  own index, like 机密商店's duplicate items); the 机密商店's six slots repeat proportionally. The client renders the
+  scaled wall (`.spov__grid--many`, four columns).
+- **the bounty monsters stay unchanged**: a bounty's enemies join only the picker's own battles
+  (`waves.js bountySpawns`), so every picker already has their own load; the draft fix only lets every seat pick one.
+
+`economy.teamSizeScaling` ({ from: 4, enabled: true }) tunes both; solo and four seats keep the official numbers. No
+protocol change: the client just renders more cards.
+
 ### Opt-in adaptive strategies
 
 [ASSUMED] The registered `adaptive` strategy keeps legacy band picking and procurement and adds map-independent

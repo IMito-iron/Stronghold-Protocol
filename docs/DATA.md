@@ -781,6 +781,14 @@ See PLUGINS.md for namespaces, limits and the local-table version recorded by Fo
 
 Run `node tools/build-data.mjs --offline --sync-player-limit` to regenerate only bossHpScale.aliveFull from MAX_SEATS in the existing config. The full data build uses the same constant. This avoids unrelated official-data changes when updating room capacity.
 
+### Fork balance above four players (2026-11-03)
+
+`server/match/gamedata.js teamScale()` = 1 at four seats or fewer, else seats / 4. `poolCopies` multiplies the shared
+copies by it (on top of `coopPoolMultiplier`) and `itemPoolCopies` by it (the item stock has no co-op multiplier); the
+match sets `gd.teamSize` from its seats before the pools are built. `server/match/choices.js draftCardCount` scales
+the 机变 count (`Math.round(6 × seats / 4)` above four) and a short bounty list repeats a card. `economy.teamSizeScaling`
+({ from: 4, enabled: true }) overrides the threshold / turns it off. Four seats and solo are unchanged.
+
 ## Official versions (M0)
 
 Presentation is shared across the official builds: `tools/assets/versions.mjs` reads their rosters by charId,

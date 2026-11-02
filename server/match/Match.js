@@ -437,6 +437,9 @@ export class Match {
     }
     if (!this.players.size) throw new TypeError('Match: seats required');
     this.order = [...this.players.values()].sort((a, b) => a.seat - b.seat);
+    // Fork: the shared stock scales with the seats above four (gamedata.teamScale; the pool and the item stock are
+    // created below from this count)
+    this.gd.teamSize = this.order.length;
     /**
      * Spectator seats (opts.spectators / addSpectator): playerId → a stand-in every watch path treats like an eliminated
      * human (alive false; no PlayerState, never a field's player or authority).

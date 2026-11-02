@@ -439,6 +439,10 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .spov__tw small { font-size: calc(.17 * var(--t)); font-weight: 400; color: #c2c8c6; }
 .spov__turn .countdown { padding-left: .22rem; border-left: 1px solid rgba(220, 228, 225, .22); }
 .spov__grid { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); gap: .2rem; }
+/* Fork (eight seats): a draft scaled above six cards — four columns, the rows share the grid's height */
+.spov__grid--many { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: none; grid-auto-rows: minmax(0, 1fr); gap: .16rem; }
+.spov__grid--many .spcard__desc { -webkit-line-clamp: 5; }
+@media (max-height: 520px) { .spov__grid--many .spcard__desc { -webkit-line-clamp: 4; } }
 /* the shared draft (the official 悬赏决策, the event's video 9:59): the grid keeps clear of the right-hand HUD; the top bar
    stays (the round, the funds and the timer stay readable while the others pick) */
 @media (min-height: 432px) {
